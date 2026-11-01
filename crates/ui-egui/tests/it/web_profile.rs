@@ -105,3 +105,78 @@ fn web_home_reads_compilo_pdf_not_pdfcraft() {
 fn desktop_window_title_is_unchanged() {
     assert_eq!(harness(false).state().window_title, "PdfCraft");
 }
+
+/// A small valid PDF.
+fn pdf() -> Vec<u8> {
+    PdfCraftApp::new().session.create_from_text("fixture", "hello").unwrap().as_slice().to_vec()
+}
+
+#[test]
+fn every_desktop_only_id_is_a_real_command() {
+    for id in web_profile::DESKTOP_ONLY {
+        assert!(pdfcraft_engine::commands::command(id).is_some(), "{id} is not a registered command");
+    }
+    // OCR and certificate signing each contribute at least one id.
+    assert!(web_profile::DESKTOP_ONLY.iter().any(|id| id.starts_with("ocr.")));
+    assert!(web_profile::DESKTOP_ONLY.iter().any(|id| id.starts_with("sign.")));
+}
+
+#[test]
+fn desktop_build_is_unaffected() {
+    let app = PdfCraftApp::new();
+    for id in web_profile::DESKTOP_ONLY {
+        assert!(!app.desktop_only(id), "{id} must stay available on the desktop");
+    }
+    let mut web = PdfCraftApp::new();
+    web.set_web_profile();
+    assert!(web_profile::DESKTOP_ONLY.iter().all(|id| web.desktop_only(id)));
+    assert!(!web.desktop_only("file.open"), "other commands are not marked");
+}
+
+#[test]
+fn desktop_only_commands_are_refused_with_a_hint_on_web() {
+    let mut h = harness(true);
+    h.state_mut().open_bytes("a.pdf", None, pdf()).unwrap();
+    h.run_steps(3);
+    for id in web_profile::DESKTOP_ONLY {
+        h.state_mut().toast = None;
+        assert!(!h.state_mut().execute(id), "{id} must not run on the web");
+        let toast = h.state().toast.clone().map(|(text, _)| text).unwrap_or_default();
+        assert!(toast.contains("Desktop app only"), "{id}: {toast}");
+    }
+}
+
+#[test]
+fn desktop_only_menu_entries_are_disabled_on_web_and_enabled_on_the_desktop() {
+    for (web, disabled) in [(true, true), (false, false)] {
+        let mut h = harness(web);
+        h.state_mut().open_bytes("a.pdf", None, pdf()).unwrap();
+        h.run_steps(3);
+        crate::support::open_menu(&mut h, "Sign");
+        let row = crate::support::menu_row(&h, "Digitally sign");
+        assert_eq!(row.accesskit_node().is_disabled(), disabled, "web profile: {web}");
+    }
+}
+
+#[test]
+fn the_ocr_panel_marks_its_desktop_only_items_and_links_to_the_download_on_web() {
+    let mut h = harness(true);
+    h.state_mut().open_bytes("a.pdf", None, pdf()).unwrap();
+    h.state_mut().left = pdfcraft_ui_egui::LeftPanel::Tool("scan");
+    h.state_mut().left_open = true;
+    h.run_steps(4);
+    h.get_by_label(web_profile::DOWNLOAD_LABEL);
+    h.get_by_label("In this file").hover();
+    h.run_steps(4);
+    h.get_by_label_contains("Desktop app only");
+}
+
+#[test]
+fn the_desktop_ocr_panel_has_no_download_link() {
+    let mut h = harness(false);
+    h.state_mut().open_bytes("a.pdf", None, pdf()).unwrap();
+    h.state_mut().left = pdfcraft_ui_egui::LeftPanel::Tool("scan");
+    h.state_mut().left_open = true;
+    h.run_steps(4);
+    assert!(h.query_by_label(web_profile::DOWNLOAD_LABEL).is_none());
+}

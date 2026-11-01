@@ -79,6 +79,9 @@ impl PdfCraftApp {
     /// Whether a registered command can run now. The engine judges the document (security,
     /// contents, undo history); view state it can't see is checked here.
     pub(crate) fn command_enabled(&self, spec: &CommandSpec) -> bool {
+        if self.desktop_only(spec.id) {
+            return false;
+        }
         // Undo and Redo act on the Combine files list while its tab shows.
         if self.combine_showing() && matches!(spec.needs, commands::Needs::Undo | commands::Needs::Redo) {
             return self.combine_can_undo(spec.needs == commands::Needs::Undo);
@@ -118,6 +121,9 @@ impl PdfCraftApp {
 
     /// Why the command can't run right now, for the user.
     fn disabled_reason(&self, spec: &CommandSpec) -> String {
+        if self.desktop_only(spec.id) {
+            return tl!("Desktop app only").to_string();
+        }
         match spec.needs {
             commands::Needs::Undo => tl!("Nothing to undo").to_string(),
             commands::Needs::Redo => tl!("Nothing to redo").to_string(),

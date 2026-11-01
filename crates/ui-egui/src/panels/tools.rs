@@ -181,6 +181,11 @@ fn tool_detail(app: &mut PdfCraftApp, ui: &mut egui::Ui, t: &Tokens, g: &'static
             );
         });
     }
+    // The browser build cannot run some of this tool's items: say so, and say where to get them.
+    if g.sections.iter().any(|s| s.items.iter().any(|i| app.desktop_only(i.command))) {
+        ui.hyperlink_to(crate::web_profile::DOWNLOAD_LABEL, crate::web_profile::DOWNLOAD_URL);
+        ui.add_space(6.0);
+    }
     if g.id == "measure" {
         crate::measure_ui::panel(app, ui, t);
         return;
@@ -219,7 +224,8 @@ fn tool_detail(app: &mut PdfCraftApp, ui: &mut egui::Ui, t: &Tokens, g: &'static
                 }
                 let (rect, resp) = ui.allocate_exact_size(vec2(ui.available_width(), 34.0), Sense::click());
                 resp.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, true, tl!(item.label)));
-                let ready = item.availability == Availability::Ready;
+                let desktop_only = app.desktop_only(item.command);
+                let ready = item.availability == Availability::Ready && !desktop_only;
                 let press = theme::Press::track(ui, &resp);
                 press.wash(ui, rect, 6, false);
                 let body = rect.translate(press.offset());
@@ -232,6 +238,7 @@ fn tool_detail(app: &mut PdfCraftApp, ui: &mut egui::Ui, t: &Tokens, g: &'static
                     if ready { hue(g) } else { t.text_faint },
                 );
                 let (chip, fill, cfg) = match item.availability {
+                    Availability::Ready if desktop_only => ("Desktop", t.pressed, t.text_muted),
                     Availability::Ready => (tl!("Ready"), Color32::from_rgb(0xDD, 0xF3, 0xE4), Color32::from_rgb(0x1E, 0x7B, 0x43)),
                     Availability::Planned(m) => (m, t.pressed, t.text_muted),
                     Availability::Provider => ("AI", t.pressed, t.text_muted),
@@ -243,7 +250,12 @@ fn tool_detail(app: &mut PdfCraftApp, ui: &mut egui::Ui, t: &Tokens, g: &'static
                 row_label(ui, tl!(item.label), theme::regular(13.0), fg, body.left_center() + vec2(34.0, 0.0), r.left() - body.left() - 42.0);
                 ui.painter().rect_filled(r, CornerRadius::same(4), fill);
                 ui.painter().text(r.center(), Align2::CENTER_CENTER, chip_label, font, cfg);
-                let resp = theme::hand(resp).on_hover_text(format!("{} — {}", tl!(item.label), item.command));
+                let tip = if desktop_only {
+                    format!("{} — {}", tl!("Desktop app only"), tl!(item.label))
+                } else {
+                    format!("{} — {}", tl!(item.label), item.command)
+                };
+                let resp = theme::hand(resp).on_hover_text(tip);
                 // An entry with further commands opens a menu; its caret goes before the chip.
                 if item.actions.is_empty() {
                     if resp.clicked() {
