@@ -1,9 +1,14 @@
 //! The Neon theme: a near-black violet base with cyan, magenta, violet and lime accents. It lives in
 //! its own file so the Light and Dark code in `theme.rs` stays as it was.
 
-use egui::{Color32, Shadow, Stroke, Visuals};
+use egui::{Color32, CornerRadius, Mesh, Painter, Rect, Shadow, Shape, Stroke, Visuals, pos2, vec2};
 
 use super::{ThemeKind, Tokens};
+
+/// Height of the line [`underline`] draws.
+const LINE: f32 = 1.5;
+/// How far below the bar the glow of [`underline`] reaches.
+const BLOOM: f32 = 24.0;
 
 /// The four glow colours of the Neon theme.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -60,6 +65,127 @@ pub(super) fn style(v: &mut Visuals, t: &Tokens) {
     v.hyperlink_color = n.cyan;
     v.window_shadow = Shadow { offset: [0, 0], blur: 32, spread: 2, color: n.violet.gamma_multiply(0.35) };
     v.popup_shadow = Shadow { offset: [0, 0], blur: 20, spread: 1, color: n.violet.gamma_multiply(0.3) };
+}
+
+/// A soft halo of `color` around `rect`, as one blurred shadow with no offset. `strength` runs from
+/// 0 (nothing) to 1 (full); above 1 is clamped, and a value that is not a number, or a rectangle
+/// that is not finite, paints nothing.
+pub fn glow(painter: &Painter, rect: Rect, radius: impl Into<CornerRadius>, color: Color32, strength: f32) {
+    if !strength.is_finite() || strength <= 0.0 || !rect.is_finite() {
+        return;
+    }
+    let s = strength.min(1.0);
+    // `as u8` saturates, and both values are small for a strength in 0..=1.
+    let shadow =
+        Shadow { offset: [0, 0], blur: (6.0 + 26.0 * s).round() as u8, spread: (2.0 * s).round() as u8, color: color.gamma_multiply(0.55 * s) };
+    painter.add(shadow.as_shape(rect, radius));
+}
+
+/// The glowing line under the top bar: cyan, violet, then magenta along the bottom edge of `bar`,
+/// with a violet bloom that spreads only downwards so it never tints the bar's own content.
+pub fn underline(painter: &Painter, bar: Rect, accents: NeonAccents) {
+    if !bar.is_finite() || bar.width() < 2.0 || bar.height() <= 0.0 {
+        return;
+    }
+    let line = Rect::from_min_max(pos2(bar.left(), bar.bottom() - LINE), bar.right_bottom());
+    let below = Rect::from_min_max(bar.left_bottom(), bar.right_bottom() + vec2(0.0, BLOOM));
+    glow(&painter.with_clip_rect(below), line, 0, accents.violet, 0.6);
+    let mut mesh = Mesh::default();
+    for (x, color) in [(line.left(), accents.cyan), (line.center().x, accents.violet), (line.right(), accents.magenta)] {
+        mesh.colored_vertex(pos2(x, line.top()), color);
+        mesh.colored_vertex(pos2(x, line.bottom()), color);
+    }
+    for first in [0, 2] {
+        mesh.add_triangle(first, first + 1, first + 2);
+        mesh.add_triangle(first + 1, first + 2, first + 3);
+    }
+    painter.add(Shape::mesh(mesh));
+}
+
+#[cfg(test)]
+mod glow_tests {
+    use egui::epaint::ClippedShape;
+    use egui::{Color32, Rect, Shape, pos2, vec2};
+
+    use super::{NeonAccents, glow, tokens, underline};
+
+    fn paint(add: impl FnOnce(&egui::Painter)) -> Vec<ClippedShape> {
+        let ctx = egui::Context::default();
+        let mut add = Some(add);
+        let mut output = ctx.run_ui(egui::RawInput::default(), |ui| {
+            if let Some(add) = add.take() {
+                add(ui.painter());
+            }
+        });
+        output.textures_delta.clear();
+        output.shapes
+    }
+
+    /// The blur of every blurred rectangle among `shapes`, which is how a `Shadow` arrives.
+    fn blurs(shapes: &[ClippedShape]) -> Vec<f32> {
+        shapes.iter().filter_map(|s| if let Shape::Rect(r) = &s.shape { (r.blur_width > 0.0).then_some(r.blur_width) } else { None }).collect()
+    }
+
+    fn page() -> Rect {
+        Rect::from_min_size(pos2(40.0, 40.0), vec2(300.0, 400.0))
+    }
+
+    fn accents() -> NeonAccents {
+        tokens().neon.expect("Neon carries its accents")
+    }
+
+    #[test]
+    fn glow_paints_nothing_for_zero_negative_or_non_finite_strength() {
+        for strength in [0.0, -1.0, f32::NAN, f32::INFINITY, f32::NEG_INFINITY] {
+            let shapes = paint(|p| glow(p, page(), 0, accents().violet, strength));
+            assert!(blurs(&shapes).is_empty(), "strength {strength}");
+        }
+    }
+
+    #[test]
+    fn glow_paints_nothing_for_a_rectangle_that_is_not_finite() {
+        let shapes = paint(|p| glow(p, Rect::NOTHING, 0, accents().violet, 1.0));
+        assert!(blurs(&shapes).is_empty());
+    }
+
+    #[test]
+    fn glow_grows_with_strength_and_stops_at_one() {
+        let blur = |strength: f32| {
+            let b = blurs(&paint(|p| glow(p, page(), 0, accents().violet, strength)));
+            assert_eq!(b.len(), 1, "one shape at strength {strength}");
+            b[0]
+        };
+        assert!(blur(1.0) > blur(0.4), "a stronger glow is wider");
+        assert!(blur(0.4) > 0.0);
+        assert_eq!(blur(7.0), blur(1.0), "above 1 is clamped");
+    }
+
+    #[test]
+    fn glow_keeps_the_colour_it_is_given() {
+        let shapes = paint(|p| glow(p, page(), 0, accents().magenta, 1.0));
+        let Some(Shape::Rect(r)) = shapes.iter().map(|s| &s.shape).find(|s| matches!(s, Shape::Rect(_))) else { panic!("no rectangle painted") };
+        assert!(r.fill.r() > r.fill.g() && r.fill.b() > r.fill.g(), "magenta stays magenta: {:?}", r.fill);
+        assert_ne!(r.fill, Color32::BLACK);
+    }
+
+    #[test]
+    fn underline_paints_a_gradient_from_cyan_to_magenta() {
+        let bar = Rect::from_min_size(pos2(0.0, 0.0), vec2(800.0, 36.0));
+        let shapes = paint(|p| underline(p, bar, accents()));
+        let colours: Vec<Color32> = shapes
+            .iter()
+            .filter_map(|s| if let Shape::Mesh(m) = &s.shape { Some(m.vertices.iter().map(|v| v.color).collect::<Vec<_>>()) } else { None })
+            .flatten()
+            .collect();
+        assert!(colours.contains(&accents().cyan) && colours.contains(&accents().magenta), "{colours:?}");
+    }
+
+    #[test]
+    fn underline_paints_nothing_for_a_bar_that_is_empty_or_not_finite() {
+        for bar in [Rect::NOTHING, Rect::from_min_size(pos2(0.0, 0.0), vec2(0.0, 36.0)), Rect::from_min_size(pos2(f32::NAN, 0.0), vec2(10.0, 10.0))] {
+            assert!(paint(|p| underline(p, bar, accents())).is_empty(), "{bar:?}");
+        }
+    }
 }
 
 #[cfg(test)]

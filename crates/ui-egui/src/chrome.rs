@@ -36,7 +36,7 @@ pub fn tab_strip(app: &mut PdfCraftApp, ui: &mut egui::Ui) {
     let mac = cfg!(target_os = "macos") && app.integrated_titlebar;
     let left = if mac { MAC_CONTENT_LEFT as i8 } else { 8 };
     let (tab_h, button) = if mac { (MAC_TITLE_BAR - 2.0, 24.0) } else { (TAB_HEIGHT, STRIP_BUTTON) };
-    egui::Panel::top("tab_strip")
+    let strip = egui::Panel::top("tab_strip")
         .exact_size(if mac { MAC_TITLE_BAR } else { TAB_STRIP })
         .frame(egui::Frame::NONE.fill(t.titlebar).inner_margin(egui::Margin { left, right: 10, top: 0, bottom: 0 }))
         .show(ui, |ui| {
@@ -318,6 +318,12 @@ pub fn tab_strip(app: &mut PdfCraftApp, ui: &mut egui::Ui) {
                 });
             });
         });
+    // Neon: a glowing line under the strip. It has its own layer, so the next panels' fills don't
+    // cover the bloom that spreads below.
+    if let Some(neon) = t.neon {
+        let painter = ui.ctx().layer_painter(egui::LayerId::new(egui::Order::Foreground, egui::Id::unique("neon-underline")));
+        theme::neon::underline(&painter, strip.response.rect, neon);
+    }
 }
 
 /// The right-click menu on the title bar's theme button.

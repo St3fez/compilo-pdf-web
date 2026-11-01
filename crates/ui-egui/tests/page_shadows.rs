@@ -116,6 +116,53 @@ fn viewport_fades(h: &Harness<'static, PdfCraftApp>) -> Vec<egui::Rect> {
         .collect()
 }
 
+/// Neon pages keep their white paper and float on a wide violet glow instead of the black shadow.
+#[test]
+fn neon_page_floats_on_a_violet_glow_and_stays_white() {
+    let h = harness("neon");
+    let (_, page) = h.state().views[0].visible_page_rects()[0];
+    fn collect(shape: &egui::Shape, out: &mut Vec<egui::epaint::RectShape>) {
+        match shape {
+            egui::Shape::Vec(shapes) => shapes.iter().for_each(|s| collect(s, out)),
+            egui::Shape::Rect(r) => out.push(r.clone()),
+            _ => {}
+        }
+    }
+    let mut rects = Vec::new();
+    for s in &h.output().shapes {
+        collect(&s.shape, &mut rects);
+    }
+    assert!(rects.iter().any(|r| r.fill == egui::Color32::WHITE && r.rect == page), "the paper is plain white");
+    // `Shadow::as_shape` grows the corner radius by the spread, so the glow is not exactly square.
+    let glow = rects.iter().find(|r| r.blur_width > 14.0 && r.rect.contains_rect(page) && r.rect.width() < page.width() + 20.0);
+    let glow = glow.expect("a glow wider than the old shadow hugs the page");
+    assert!(glow.fill.b() > glow.fill.g() && glow.fill.r() > glow.fill.g(), "violet, not black: {:?}", glow.fill);
+    assert!(shadows(&h, false).is_empty(), "the black page shadow is gone");
+}
+
+/// The Neon glow must not leak into the other themes: Light keeps its black shadow.
+#[test]
+fn light_page_shadow_is_unchanged() {
+    let h = harness("light");
+    let (_, page) = h.state().views[0].visible_page_rects()[0];
+    assert!(!shadows(&h, false).is_empty(), "the black page shadow is still there");
+    let mut rects = Vec::new();
+    fn collect(shape: &egui::Shape, out: &mut Vec<egui::epaint::RectShape>) {
+        match shape {
+            egui::Shape::Vec(shapes) => shapes.iter().for_each(|s| collect(s, out)),
+            egui::Shape::Rect(r) => out.push(r.clone()),
+            _ => {}
+        }
+    }
+    for s in &h.output().shapes {
+        collect(&s.shape, &mut rects);
+    }
+    assert!(
+        !rects.iter().any(|r| r.blur_width > 14.0 && r.rect.contains_rect(page) && r.rect.width() < page.width() + 20.0),
+        "no glow around a Light page"
+    );
+}
+
 #[test]
 fn organize_shadows_follow_the_preference() {
     for theme in ["light", "dark"] {

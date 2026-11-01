@@ -954,7 +954,12 @@ fn paint_page_surface(ui: &mut egui::Ui, view: &mut DocView, frame: &mut PageFra
     let painter = ui.painter();
     // Shadows would darken the preceding page when pages touch.
     if view.show_page_gaps && frame.env.show_page_edge_shadows {
-        painter.add(egui::epaint::Shadow { offset: [0, 3], blur: 14, spread: 0, color: t.page_shadow }.as_shape(r, CornerRadius::ZERO));
+        if let Some(neon) = t.neon {
+            // Neon: the page floats on a violet glow instead of a black shadow.
+            theme::neon::glow(painter, r, CornerRadius::ZERO, neon.violet, 1.0);
+        } else {
+            painter.add(egui::epaint::Shadow { offset: [0, 3], blur: 14, spread: 0, color: t.page_shadow }.as_shape(r, CornerRadius::ZERO));
+        }
     }
     painter.rect_filled(r, CornerRadius::ZERO, paper);
     if let Some(err) = view.errors.get(&i) {
