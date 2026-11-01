@@ -354,11 +354,17 @@ fn state_of(panels: &SidePanels, pane: Pane) -> PaneState {
     PaneState::docked(edge, panels.width(pane))
 }
 
+/// Below this width, in points, the web Home gives the whole page to its tiles.
+const WEB_HOME_NARROW: f32 = 600.0;
+
 /// The panes that show this frame, outermost first on a shared edge.
-fn open_panes(app: &PdfCraftApp) -> Vec<Pane> {
+fn open_panes(app: &PdfCraftApp, width: f32) -> Vec<Pane> {
     let mut open = Vec::new();
+    // The web Home has a tile for each tool, so on a screen this narrow the Tools pane would only
+    // take the width the tiles need.
+    let tiles_instead = app.web_profile && app.active.is_none() && width < WEB_HOME_NARROW;
     // Read mode hides the tools, not the navigation panes.
-    if app.left_open && app.mode != Mode::Read {
+    if app.left_open && app.mode != Mode::Read && !tiles_instead {
         open.push(Pane::Tools);
     }
     // Home and Combine files have no side panel; the choice is kept for the next document.
@@ -381,7 +387,7 @@ pub fn show(app: &mut PdfCraftApp, ui: &mut egui::Ui) {
     if app.mode == Mode::AllTools && app.all_tools_full {
         return;
     }
-    let open = open_panes(app);
+    let open = open_panes(app, ui.available_width());
     if open.is_empty() {
         return;
     }

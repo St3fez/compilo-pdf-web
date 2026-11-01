@@ -33,7 +33,7 @@ impl PdfCraftApp {
                 };
                 self.set_theme_preference(preference);
             }
-            ("web_profile", _) => {
+            ("web_profile" | "web-profile", _) => {
                 if value.parse::<bool>().map_err(|_| "web_profile must be true or false")? {
                     self.set_web_profile();
                 }

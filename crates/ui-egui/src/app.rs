@@ -353,6 +353,11 @@ impl PdfCraftApp {
 
     /// Notify with a `{name}`-style template in the UI language (placeholders filled once).
     pub fn notify_fmt(&mut self, template: &str, args: &[(&str, &str)]) {
+        // On the web Home a tile picked before any file is open waits for the file. When the open
+        // fails there is nothing for it to start, and it must not start whatever opens next.
+        if self.web_profile && self.views.is_empty() && template.starts_with("Couldn't open ") {
+            self.left = LeftPanel::AllTools;
+        }
         self.notify(i18n::fmt(tl!(template), args));
     }
 
