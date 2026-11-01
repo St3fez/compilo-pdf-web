@@ -1,3 +1,19 @@
+## Compilo PDF on the web
+
+**Compilo PDF** is PdfCraft running in your browser: the real editor, compiled to WebAssembly, in a neon
+theme. Your PDFs never leave your computer. There is no server and no upload, and the page works offline
+once it has loaded.
+
+Open it: <https://st3fez.github.io/compilo-pdf-web/>
+
+OCR, crash recovery and signing with a PKCS #12 certificate need the desktop app; the web build marks them
+"Desktop app only".
+
+Compilo PDF is based on PdfCraft by the ArtCraft team. The code is MIT OR Apache-2.0: see
+[LICENSE-MIT](LICENSE-MIT), [LICENSE-APACHE](LICENSE-APACHE) and [NOTICE](NOTICE).
+
+---
+
 <p align="center">
   <a href="https://getartcraft.com/">
     <picture>

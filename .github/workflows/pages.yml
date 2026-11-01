@@ -1,0 +1,63 @@
+name: Pages
+
+# Compilo PDF on the web: builds apps/pdfcraft-web with Trunk and deploys it to GitHub Pages from
+# the fork St3fez/compilo-pdf-web. It lives on a fork-only branch and is never proposed upstream; the
+# repository check keeps it from running anywhere else.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# The build only reads the code. The deploy job adds what Pages needs and nothing more.
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  TRUNK_VERSION: "0.22.1"
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: build the site
+    if: github.repository == 'St3fez/compilo-pdf-web'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@686976e191b89faba57d3206551f0f330d8cb249 # stable
+        with:
+          toolchain: stable
+          targets: wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          key: pages
+      - name: Install Trunk
+        run: command -v trunk >/dev/null || cargo install --locked trunk --version "$TRUNK_VERSION"
+      - name: Build
+        working-directory: apps/pdfcraft-web
+        run: trunk build --release
+      - name: Check the site is self-contained
+        run: cargo xtask web-check
+      - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        with:
+          path: dist/web
+
+  deploy:
+    name: deploy to GitHub Pages
+    if: github.repository == 'St3fez/compilo-pdf-web'
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
