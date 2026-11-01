@@ -33,6 +33,11 @@ impl PdfCraftApp {
                 };
                 self.set_theme_preference(preference);
             }
+            ("web_profile", _) => {
+                if value.parse::<bool>().map_err(|_| "web_profile must be true or false")? {
+                    self.set_web_profile();
+                }
+            }
             ("show_page_edge_shadows", _) => {
                 self.show_page_edge_shadows = value.parse::<bool>().map_err(|_| "show_page_edge_shadows must be true or false")?;
             }

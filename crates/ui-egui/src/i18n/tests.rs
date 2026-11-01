@@ -1217,3 +1217,57 @@ fn date_languages_are_the_interface_languages() {
     let dates: Vec<(&str, &str)> = pdfcraft_engine::dates::DATE_LANGUAGES.iter().map(|l| (l.code, l.name)).collect();
     assert_eq!(dates, interface);
 }
+
+/// Clears the product name when a test ends, so a failing assertion cannot leak it into the next
+/// test that runs on the same thread.
+struct ProductName;
+
+impl ProductName {
+    fn set(name: &'static str) -> Self {
+        set_product_name(name);
+        Self
+    }
+}
+
+impl Drop for ProductName {
+    fn drop(&mut self) {
+        set_product_name("");
+    }
+}
+
+#[test]
+fn rename_replaces_every_pdfcraft() {
+    assert_eq!(rename("PdfCraft and PdfCraft", "Compilo PDF"), "Compilo PDF and Compilo PDF");
+    assert_eq!(rename("Nothing to change", "Compilo PDF"), "Nothing to change");
+}
+
+#[test]
+fn brand_is_a_noop_without_a_name() {
+    assert_eq!(tr(Lang::EN, "Welcome to PdfCraft"), "Welcome to PdfCraft");
+}
+
+#[test]
+fn brand_renames_translations_once() {
+    let _name = ProductName::set("Compilo PDF");
+    let ar = Lang::from_code("ar").expect("ar registered");
+    let first = tr(ar, "About PdfCraft");
+    assert!(first.contains("Compilo PDF") && !first.contains("PdfCraft"), "{first}");
+    assert!(std::ptr::eq(first, tr(ar, "About PdfCraft")), "the renamed text is made once and reused");
+    assert_eq!(tr(Lang::EN, "Welcome to PdfCraft"), "Welcome to Compilo PDF");
+    assert_eq!(tr_id(Lang::EN, "help.about", "About PdfCraft"), "About Compilo PDF");
+    assert_eq!(tr_ctx(Lang::EN, "nothing", "Welcome to PdfCraft"), "Welcome to Compilo PDF");
+}
+
+#[test]
+fn brand_leaves_other_strings_alone() {
+    let _name = ProductName::set("Compilo PDF");
+    let text = String::from("Close");
+    assert!(std::ptr::eq(tr(Lang::EN, &text), text.as_str()), "a string without the name comes back as it came");
+}
+
+#[test]
+fn an_empty_product_name_means_no_rebranding() {
+    set_product_name("Compilo PDF");
+    set_product_name("");
+    assert_eq!(tr(Lang::EN, "Welcome to PdfCraft"), "Welcome to PdfCraft");
+}

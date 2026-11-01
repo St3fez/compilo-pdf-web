@@ -79,4 +79,5 @@ mod ui;
 mod updates;
 mod view;
 mod viewer;
+mod web_profile;
 mod xfa;

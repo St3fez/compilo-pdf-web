@@ -280,6 +280,8 @@ impl PdfCraftApp {
         let mut used: Vec<&str> = Vec::new();
         let list = |ids: &[&'static str], used: &mut Vec<&'static str>| -> Vec<Node> {
             ids.iter()
+                // The web profile drops the links to ArtCraft's community and site.
+                .filter(|id| !(self.web_profile && crate::web_profile::HIDDEN_HELP.contains(id)))
                 .map(|&id| {
                     if id == SEP {
                         return Node::Separator;

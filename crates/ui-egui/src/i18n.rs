@@ -25,7 +25,8 @@
 
 mod catalog;
 
-use std::cell::Cell;
+use std::cell::{Cell, RefCell};
+use std::collections::HashMap;
 use std::sync::OnceLock;
 
 use catalog::Catalog;
@@ -570,6 +571,54 @@ thread_local! {
     // Per thread, as in PhotoCraft: independent app and test threads (kittest harnesses run in
     // parallel) must not change each other's drawing language.
     static CURRENT: Cell<Lang> = const { Cell::new(Lang::EN) };
+    // The name the product goes by when it is not the one the catalogues are written with. The
+    // browser build is single-threaded, so one call at start-up covers every frame.
+    static PRODUCT_NAME: Cell<Option<&'static str>> = const { Cell::new(None) };
+    // Each catalogue string that carries the old name, renamed once. The set is bounded by the
+    // catalogues, so leaking the renamed text (to hand out `&'static str`) costs a fixed amount.
+    static RENAMED: RefCell<HashMap<String, &'static str>> = RefCell::new(HashMap::new());
+}
+
+/// The name the catalogues use for the product.
+const CATALOG_NAME: &str = "PdfCraft";
+
+/// Call the product `name` wherever a catalogue says "PdfCraft". An empty name goes back to the
+/// catalogues' own wording.
+pub fn set_product_name(name: &'static str) {
+    let name = (!name.is_empty()).then_some(name);
+    if PRODUCT_NAME.replace(name) != name {
+        // Texts renamed for the previous name must not be handed out for this one.
+        RENAMED.with(|cache| {
+            if let Ok(mut cache) = cache.try_borrow_mut() {
+                cache.clear();
+            }
+        });
+    }
+}
+
+/// `text` with every "PdfCraft" replaced by `name`.
+fn rename(text: &str, name: &str) -> String {
+    text.replace(CATALOG_NAME, name)
+}
+
+/// `text` under the current product name: untouched when no name is set or `text` does not carry
+/// the old one, otherwise the renamed text, made once per distinct string and reused.
+fn brand(text: &str) -> &str {
+    let Some(name) = PRODUCT_NAME.get() else { return text };
+    if !text.contains(CATALOG_NAME) {
+        return text;
+    }
+    let renamed = RENAMED.with(|cache| {
+        // Never panic here: if the cache is somehow busy, the original wording is still readable.
+        let mut cache = cache.try_borrow_mut().ok()?;
+        if let Some(&done) = cache.get(text) {
+            return Some(done);
+        }
+        let done: &'static str = Box::leak(rename(text, name).into_boxed_str());
+        cache.insert(text.to_owned(), done);
+        Some(done)
+    });
+    renamed.unwrap_or(text)
 }
 
 /// Set the UI language for drawing (the shell calls this once per frame from the preference), so
@@ -638,7 +687,7 @@ pub fn key_name(s: &str) -> &str {
 
 /// Translate an English UI string; unknown strings come back unchanged.
 pub fn tr(lang: Lang, s: &str) -> &str {
-    lang.catalog().plain(s).unwrap_or(s)
+    brand(lang.catalog().plain(s).unwrap_or(s))
 }
 
 /// How the layers below say their own sentences in the current language.
@@ -654,12 +703,12 @@ pub fn words(wording: &str) -> String {
 
 /// Like [`tr`], for an English string that needs a disambiguating `context`.
 pub fn tr_ctx<'a>(lang: Lang, context: &str, s: &'a str) -> &'a str {
-    lang.catalog().contextual(context, s).unwrap_or_else(|| tr(lang, s))
+    brand(lang.catalog().contextual(context, s).unwrap_or_else(|| tr(lang, s)))
 }
 
 /// A string keyed by its command id, falling back to the translation of the English `label`.
 pub fn tr_id<'a>(lang: Lang, id: &str, label: &'a str) -> &'a str {
-    lang.catalog().id(id).unwrap_or_else(|| tr(lang, label))
+    brand(lang.catalog().id(id).unwrap_or_else(|| tr(lang, label)))
 }
 
 /// Fill `{name}` placeholders in one pass. Unknown placeholders are left as written, and inserted

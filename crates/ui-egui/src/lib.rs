@@ -59,6 +59,7 @@ pub use print_ui::{Handling as PrintHandling, OptionsSource, PrintDraft, Printer
 pub use redact_ui::{HiddenDraft, PagesDraft as RedactPagesDraft, RedactPrefs, SearchDraft as RedactSearchDraft, SearchMode as RedactSearchMode};
 pub mod i18n;
 pub mod theme;
+pub mod web_profile;
 mod widgets;
 
 use pdfcraft_engine::{DocId, Session};
@@ -645,6 +646,9 @@ pub struct PdfCraftApp {
     pub last_opened_url: Option<String>,
     /// The home screen's community card was closed; it comes back next launch (not remembered).
     pub community_card_closed: bool,
+    /// The browser build: named Compilo PDF, Neon by default, no ArtCraft marks
+    /// ([`PdfCraftApp::set_web_profile`]).
+    pub web_profile: bool,
     /// A document asked to open this address; the user hasn't answered yet (#90, #91).
     pub pending_link: Option<PendingLink>,
     /// A document just opened asks to be shown in Full Screen mode (`/PageMode /FullScreen`):

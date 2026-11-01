@@ -585,7 +585,15 @@ pub fn progress_notice(app: &PdfCraftApp, ctx: &egui::Context) -> bool {
     cancel
 }
 
+/// The web build draws no ArtCraft wordmark or mark, and does not even carry their SVG bytes
+/// (docs/brand/LICENSE-brand.txt): the browser build is the published one.
+#[cfg(target_arch = "wasm32")]
+pub fn artcraft_logo(ui: &mut egui::Ui, _height: f32) -> Response {
+    ui.allocate_response(vec2(0.0, 0.0), Sense::hover())
+}
+
 /// The ArtCraft wordmark (Storyteller's brand, docs/brand/; not open source), sized to `height`.
+#[cfg(not(target_arch = "wasm32"))]
 pub fn artcraft_logo(ui: &mut egui::Ui, height: f32) -> Response {
     let dark = ui.visuals().dark_mode;
     let (uri, bytes): (&str, &'static [u8]) = if dark {
@@ -596,7 +604,14 @@ pub fn artcraft_logo(ui: &mut egui::Ui, height: f32) -> Response {
     ui.add(egui::Image::from_bytes(uri, bytes).max_height(height).alt_text("ArtCraft"))
 }
 
+/// See [`artcraft_logo`]: nothing on the web.
+#[cfg(target_arch = "wasm32")]
+pub fn artcraft_mark(ui: &mut egui::Ui, _size: f32) -> Response {
+    ui.allocate_response(vec2(0.0, 0.0), Sense::hover())
+}
+
 /// The ArtCraft mark (brand blue, works on light and dark), `size` points square.
+#[cfg(not(target_arch = "wasm32"))]
 pub fn artcraft_mark(ui: &mut egui::Ui, size: f32) -> Response {
     ui.add(
         egui::Image::from_bytes("bytes://artcraft-mark.svg", include_bytes!("../../../docs/brand/artcraft-mark.svg"))

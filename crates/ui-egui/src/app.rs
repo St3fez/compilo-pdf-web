@@ -40,9 +40,10 @@ impl PdfCraftApp {
         // what closing would ask about, so a draft not yet applied counts too.
         let dirty = self.active.is_some_and(|i| self.has_unsaved_work(i));
         let mark = if dirty { " •" } else { "" };
+        let product = self.product_name();
         let titled = |name: Option<String>| {
             name.or_else(|| self.combine_showing().then(|| tl!("Combine files").to_owned()))
-                .map_or_else(|| "PdfCraft".to_owned(), |name| format!("{name}{mark} — PdfCraft"))
+                .map_or_else(|| product.to_owned(), |name| format!("{name}{mark} — {product}"))
         };
         let title = titled(self.active.and_then(|i| crate::canvas::tab_label(self, i)));
         // The web page's title is what an embedding host reads to tell which file opened, so it
@@ -256,6 +257,7 @@ impl PdfCraftApp {
             bookmark_rename: None,
             last_opened_url: None,
             community_card_closed: false,
+            web_profile: false,
             pending_link: None,
             pending_full_screen: None,
             pending_remote_link: None,
