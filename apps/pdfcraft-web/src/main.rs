@@ -83,13 +83,45 @@ fn main() {
             .await;
         if let Err(e) = started {
             eframe::web_sys::console::error_1(&e);
+            let error = e.as_string().unwrap_or_else(|| format!("{e:?}"));
+            // A blank canvas tells the visitor nothing: say what went wrong on the page itself.
+            show_fallback(&failure_text(&error));
             if query_param("host").as_deref() == Some("parent")
                 && let Some(bridge) = host::Bridge::new()
             {
-                bridge.post_failed(&e.as_string().unwrap_or_else(|| format!("{e:?}")));
+                bridge.post_failed(&error);
             }
         }
     });
+}
+
+/// What the page says when the app can't start (no WebGL, for example): one short plain sentence
+/// plus the browser's own words, cleaned of control characters and cut to 120.
+#[cfg(any(target_arch = "wasm32", test))]
+fn failure_text(error: &str) -> String {
+    let detail: String = error.chars().filter(|c| !c.is_control()).take(120).collect();
+    let detail = detail.trim();
+    let mut text = String::from("Compilo PDF could not start. It needs a browser with WebGL turned on.");
+    if !detail.is_empty() {
+        text.push_str(" (");
+        text.push_str(detail);
+        text.push(')');
+    }
+    text
+}
+
+/// Show `text` in the page's `#pdfcraft-fallback` box (as text, never as HTML) and drop the
+/// loading line.
+#[cfg(target_arch = "wasm32")]
+fn show_fallback(text: &str) {
+    let Some(document) = web_sys::window().and_then(|w| w.document()) else { return };
+    if let Some(loading) = document.get_element_by_id("pdfcraft-loading") {
+        let _ = loading.set_attribute("hidden", "");
+    }
+    if let Some(box_) = document.get_element_by_id("pdfcraft-fallback") {
+        box_.set_text_content(Some(text));
+        let _ = box_.remove_attribute("hidden");
+    }
 }
 
 #[cfg(target_arch = "wasm32")]
@@ -261,4 +293,21 @@ mod host {
 #[cfg(not(target_arch = "wasm32"))]
 fn main() {
     eprintln!("pdfcraft-web targets wasm32: run `trunk serve` or `trunk build --release` in apps/pdfcraft-web");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::failure_text;
+
+    #[test]
+    fn failure_text_mentions_webgl_and_is_never_empty_or_long() {
+        for error in ["", "WebGL not supported", "   ", "line one\nline two\u{0007}", &"x".repeat(10_000)] {
+            let text = failure_text(error);
+            assert!(text.contains("WebGL"), "{text}");
+            assert!(text.chars().count() <= 400, "{} chars", text.chars().count());
+            assert!(!text.contains('\n') && !text.contains('\u{0007}'), "{text:?}");
+        }
+        assert!(failure_text("WebGL not supported").ends_with("(WebGL not supported)"));
+        assert!(!failure_text("  ").contains("()"), "an empty detail adds no brackets");
+    }
 }

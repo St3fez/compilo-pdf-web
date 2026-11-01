@@ -13,6 +13,7 @@ mod macos_integration;
 mod parity;
 mod screenshots;
 mod version;
+mod web_check;
 
 type Command = fn(&[String]) -> anyhow::Result<()>;
 
@@ -49,6 +50,7 @@ const COMMANDS: &[(&str, &str, Command)] = &[
     ("screenshots", "Regenerate the README screenshots in docs/images/ and their ATTRIBUTION entries", screenshots::run),
     ("models", "Fetch the OCR models (ATTRIBUTION.toml kind = \"model\") into assets/models/, verified by SHA-256", assets::models),
     ("demo-pdf", "Build dist/demo/pdfcraft-showcase.pdf (needs Google Chrome or Chromium)", demo_pdf::run),
+    ("web-check", "Check that the built web site (dist/web, or the directory given) names no address outside its own origin", web_check::run),
 ];
 
 fn version_cmd(args: &[String]) -> anyhow::Result<()> {

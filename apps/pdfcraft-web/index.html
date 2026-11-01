@@ -3,15 +3,28 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>PdfCraft</title>
+    <meta name="color-scheme" content="dark" />
+    <meta name="theme-color" content="#0b0716" />
+    <title>Compilo PDF</title>
     <link data-trunk rel="rust" data-wasm-opt="z" />
     <style>
-      html, body { margin: 0; height: 100%; overflow: hidden; background: #f1f1f3; }
-      canvas { width: 100%; height: 100%; display: block; outline: none; }
-      @media (prefers-color-scheme: dark) { html, body { background: #19191c; } }
+      html, body { margin: 0; height: 100%; overflow: hidden; background: #0b0716; color: #f3eeff; font: 15px/1.5 system-ui, sans-serif; }
+      canvas { position: relative; z-index: 1; width: 100%; height: 100%; display: block; outline: none; }
+      /* The loading line sits behind the canvas, which covers it once the app paints its first frame. */
+      #pdfcraft-loading, #pdfcraft-fallback { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; padding: 24px; text-align: center; }
+      #pdfcraft-loading { color: #7df7ff; letter-spacing: 0.04em; text-shadow: 0 0 12px #4dfcff; }
+      #pdfcraft-fallback { z-index: 2; background: #0b0716; }
+      #pdfcraft-fallback[hidden] { display: none; }
     </style>
   </head>
   <body>
+    <div id="pdfcraft-loading">Loading Compilo PDF…</div>
     <canvas id="pdfcraft"></canvas>
+    <div id="pdfcraft-fallback" role="alert" hidden></div>
+    <noscript>
+      <div style="position: absolute; inset: 0; z-index: 3; display: flex; align-items: center; justify-content: center; padding: 24px; text-align: center; background: #0b0716;">
+        Compilo PDF needs JavaScript and a browser with WebGL turned on.
+      </div>
+    </noscript>
   </body>
 </html>
