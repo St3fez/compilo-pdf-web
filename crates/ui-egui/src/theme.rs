@@ -11,6 +11,8 @@ pub enum ThemeKind {
     #[default]
     Light,
     Dark,
+    /// Dark violet with cyan, magenta, violet and lime accents (see [`neon`]). The default only on the web.
+    Neon,
 }
 
 /// The saved user choice, independent of the light/dark colours currently displayed. A fresh
@@ -21,6 +23,7 @@ pub enum ThemePreference {
     System,
     Light,
     Dark,
+    Neon,
 }
 
 impl ThemePreference {
@@ -30,6 +33,7 @@ impl ThemePreference {
         match self {
             Self::Light => ThemeKind::Light,
             Self::Dark => ThemeKind::Dark,
+            Self::Neon => ThemeKind::Neon,
             Self::System => match system {
                 Some(true) => ThemeKind::Dark,
                 Some(false) => ThemeKind::Light,
@@ -66,6 +70,8 @@ pub struct Tokens {
     pub badge_new: Color32,
     pub page_shadow: Color32,
     pub radius: u8,
+    /// The glow colours; `Some` only in the Neon theme.
+    pub neon: Option<neon::NeonAccents>,
 }
 
 impl Tokens {
@@ -94,6 +100,7 @@ impl Tokens {
                 badge_new: Color32::from_rgb(0x1B, 0x63, 0xE0),
                 page_shadow: Color32::from_black_alpha(34),
                 radius: 6,
+                neon: None,
             },
             ThemeKind::Dark => Self {
                 kind,
@@ -118,7 +125,9 @@ impl Tokens {
                 badge_new: Color32::from_rgb(0x3D, 0x7D, 0xEE),
                 page_shadow: Color32::from_black_alpha(120),
                 radius: 6,
+                neon: None,
             },
+            ThemeKind::Neon => neon::tokens(),
         }
     }
 
@@ -127,8 +136,9 @@ impl Tokens {
         ctx.data(|d| d.get_temp::<Tokens>(egui::Id::unique("pdfcraft-theme"))).unwrap_or_else(|| Self::for_kind(ThemeKind::Light))
     }
 
+    /// Whether the chrome is dark (egui's dark visuals): Dark and Neon.
     pub fn dark(&self) -> bool {
-        self.kind == ThemeKind::Dark
+        self.kind != ThemeKind::Light
     }
 }
 
@@ -470,6 +480,7 @@ pub fn apply(ctx: &egui::Context, kind: ThemeKind) {
     if !t.dark() {
         v.text_options.color_transfer_function = egui::epaint::FontColorTransferFunction::Gamma(0.75);
     }
+    neon::style(&mut v, &t);
     ctx.set_visuals(v);
     ctx.global_style_mut(|s| {
         // RTL languages mirror stock chrome (menus, combo boxes, scroll bars, headers).
@@ -537,6 +548,8 @@ pub fn contrast(a: Color32, b: Color32) -> f32 {
 pub fn readable(color: Color32, background: Color32, text: Color32) -> Color32 {
     (0..=4).map(|step| color.lerp_to_gamma(text, step as f32 / 4.0)).find(|c| contrast(*c, background) >= 3.0).unwrap_or(text)
 }
+
+pub mod neon;
 
 #[cfg(test)]
 mod tests;

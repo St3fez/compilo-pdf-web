@@ -1668,10 +1668,10 @@ area = "B"
 tier = "P1"
 milestone = "M3"
 status = "shipped"
-commands = ["view.theme", "view.theme.light", "view.theme.dark"]
+commands = ["view.theme", "view.theme.light", "view.theme.dark", "view.theme.neon"]
 tools = []
-evidence = ["crates/ui-egui/tests/it/theme.rs::toolbar_and_view_menu_share_three_state_preferences", "crates/ui-egui/src/theme/tests.rs::text_is_readable_on_every_surface"]
-notes = "Toolbar and Display theme share three choices and a preference setter; manual choices exit system mode. Every text colour meets WCAG AA (4.5:1) on every surface in both themes; glyphs are pixel-aligned for sharper text at 100–150 % scaling."
+evidence = ["crates/ui-egui/tests/it/theme.rs::toolbar_and_view_menu_share_three_state_preferences", "crates/ui-egui/src/theme/tests.rs::text_is_readable_on_every_surface", "crates/ui-egui/tests/it/theme.rs::running_view_theme_neon_selects_neon"]
+notes = "Toolbar and Display theme share three choices and a preference setter; manual choices exit system mode. Every text colour meets WCAG AA (4.5:1) on every surface in both themes; glyphs are pixel-aligned for sharper text at 100–150 % scaling. Neon (dark violet with cyan, magenta, violet and lime glows) is a fourth choice from the Display theme menu and Preferences; it meets the same contrast rule."
 
 [[feature]]
 id = "view.theme-system"

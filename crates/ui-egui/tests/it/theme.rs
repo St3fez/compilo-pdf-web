@@ -284,3 +284,50 @@ fn preferences_theme_cards_and_use_system_setting_stay_in_sync() {
     assert_theme(&h, ThemePreference::Dark, ThemeKind::Dark);
     assert_eq!(mode_shown(&h), "Dark");
 }
+
+#[test]
+fn running_view_theme_neon_selects_neon() {
+    let mut app = PdfCraftApp::new();
+    app.set_option("language", "en").unwrap();
+    app.run_command("view.theme.neon");
+    assert_eq!(app.theme_preference, ThemePreference::Neon);
+    assert_eq!(app.theme, ThemeKind::Neon);
+    app.run_command("view.theme.dark");
+    app.set_option("theme", "neon").unwrap();
+    assert_eq!(app.theme_preference, ThemePreference::Neon);
+    assert_eq!(app.theme, ThemeKind::Neon);
+}
+
+#[test]
+fn neon_applies_dark_visuals_and_the_toolbar_leaves_it_for_system() {
+    let mut h = harness();
+    h.state_mut().set_theme_preference(ThemePreference::Neon);
+    h.run_steps(3);
+    let neon = Tokens::for_kind(ThemeKind::Neon);
+    assert_eq!(h.state().theme, ThemeKind::Neon);
+    assert_eq!(Tokens::get(&h.ctx).kind, ThemeKind::Neon);
+    assert!(h.ctx.global_style().visuals.dark_mode);
+    assert_eq!(h.ctx.global_style().visuals.panel_fill, neon.panel);
+    // The click cycle stays System, Light, Dark; Neon is chosen from the menu or Preferences.
+    click_toolbar(&mut h, "Neon");
+    assert_theme(&h, ThemePreference::System, ThemeKind::Dark);
+}
+
+#[test]
+fn neon_is_saved_and_older_or_unknown_settings_still_load() {
+    let mut app = PdfCraftApp::new();
+    app.set_option("language", "en").unwrap();
+    app.set_option("theme", "neon").unwrap();
+    let saved = app.persist();
+    let mut restored = PdfCraftApp::new();
+    restored.set_option("language", "en").unwrap();
+    restored.restore(&saved);
+    assert_eq!(restored.theme_preference, ThemePreference::Neon);
+    assert_eq!(restored.theme, ThemeKind::Neon);
+    // Settings written by a build that has no Neon keep working, and a theme name this build does
+    // not know leaves the visitor's saved choice alone.
+    restored.restore(r#"{"theme":"Dark"}"#);
+    assert_eq!((restored.theme_preference, restored.theme), (ThemePreference::Dark, ThemeKind::Dark));
+    restored.restore(r#"{"theme":"Plasma"}"#);
+    assert_eq!((restored.theme_preference, restored.theme), (ThemePreference::Dark, ThemeKind::Dark));
+}

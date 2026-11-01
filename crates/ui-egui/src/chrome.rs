@@ -294,15 +294,17 @@ pub fn tab_strip(app: &mut PdfCraftApp, ui: &mut egui::Ui) {
                         ThemePreference::System => ("monitor", tl!("Use system setting")),
                         ThemePreference::Light => ("sun", tl!("Light gray")),
                         ThemePreference::Dark => ("moon", tl!("Dark gray")),
+                        ThemePreference::Neon => ("sparkles", tl!("Neon")),
                     };
                     let tip = format!("{}: {label}", tl!("Display theme"));
                     let response = icons::button(ui, icon, button, false, &tip);
-                    // A click cycles System, Light, Dark; a right-click opens the menu.
+                    // A click cycles System, Light, Dark; a right-click opens the menu, where Neon is
+                    // chosen. A click on Neon goes back to System.
                     if response.clicked() {
                         app.execute(match app.theme_preference {
                             ThemePreference::System => "view.theme.light",
                             ThemePreference::Light => "view.theme.dark",
-                            ThemePreference::Dark => "view.theme.system",
+                            ThemePreference::Dark | ThemePreference::Neon => "view.theme.system",
                         });
                     }
                     egui::Popup::context_menu(&response).id(response.id.with("theme_menu")).show(|ui| appearance_menu(app, ui));
