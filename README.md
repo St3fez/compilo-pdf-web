@@ -1,10 +1,15 @@
 ## Compilo PDF on the web
 
 **Compilo PDF** is PdfCraft running in your browser: the real editor, compiled to WebAssembly, in a neon
-theme. Your PDFs never leave your computer. There is no server and no upload, and the page works offline
-once it has loaded.
+theme. Your PDFs never leave your computer. There is no server and no upload: once the page has loaded it
+makes no further requests, so it keeps working if the network goes away. There is no service worker, so
+reloading it while offline works only while the browser still holds its cache (GitHub Pages sets ten minutes).
 
 Open it: <https://st3fez.github.io/compilo-pdf-web/>
+
+The first visit downloads about 17.5 MB, almost all of it the WebAssembly (47 MB once unpacked, as GitHub
+Pages serves it compressed); the scripts are 26 KB. With the files cached the editor starts in about one
+second.
 
 OCR, crash recovery and signing with a PKCS #12 certificate need the desktop app; the web build marks them
 "Desktop app only".
