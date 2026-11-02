@@ -1,29 +1,69 @@
 <!doctype html>
-<html lang="en">
+<html lang="it">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="color-scheme" content="dark" />
     <meta name="theme-color" content="#0b0716" />
-    <title>Compilo PDF</title>
+    <title>Compilo PDF – compila, firma e modifica PDF online gratis</title>
+    <meta name="description" content="Compila e firma moduli PDF, modifica il testo, converti in Word, stampa e riconosci il testo delle scansioni (OCR) nel browser. Gratis e senza account: i file non lasciano il tuo dispositivo." />
+    <meta name="robots" content="index, follow" />
+    <meta name="application-name" content="Compilo PDF" />
+    <link rel="canonical" href="https://st3fez.github.io/compilo-pdf-web/" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Compilo PDF" />
+    <meta property="og:locale" content="it_IT" />
+    <meta property="og:title" content="Compilo PDF – compila, firma e modifica PDF online gratis" />
+    <meta property="og:description" content="Compila e firma moduli PDF, modifica il testo, converti in Word, stampa e usa l'OCR nel browser. Gratis, senza account, i file restano sul tuo dispositivo." />
+    <meta property="og:url" content="https://st3fez.github.io/compilo-pdf-web/" />
+    <meta property="og:image" content="https://st3fez.github.io/compilo-pdf-web/og-image.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="La Home di Compilo PDF: Compila e firma, Modifica, Converti e OCR" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "WebApplication",
+        "name": "Compilo PDF",
+        "url": "https://st3fez.github.io/compilo-pdf-web/",
+        "description": "Editor PDF nel browser: compila e firma moduli, modifica il testo, converti in Word, stampa e riconosci il testo delle scansioni (OCR). I file restano sul dispositivo.",
+        "applicationCategory": "BusinessApplication",
+        "operatingSystem": "Qualsiasi browser moderno",
+        "inLanguage": "it",
+        "isAccessibleForFree": true,
+        "offers": { "@type": "Offer", "price": "0", "priceCurrency": "EUR" },
+        "featureList": ["Compilare moduli PDF", "Firmare PDF", "Modificare il testo di un PDF", "Convertire PDF in Word", "Stampare PDF", "OCR: riconoscimento del testo nelle scansioni"]
+      }
+    </script>
+    <link data-trunk rel="icon" href="favicon.svg" />
+    <link data-trunk rel="copy-file" href="og-image.png" />
+    <link data-trunk rel="copy-file" href="sitemap.xml" />
     <link data-trunk rel="rust" data-wasm-opt="z" />
     <style>
       html, body { margin: 0; height: 100%; overflow: hidden; background: #0b0716; color: #f3eeff; font: 15px/1.5 system-ui, sans-serif; }
       canvas { position: relative; z-index: 1; width: 100%; height: 100%; display: block; outline: none; }
-      /* The loading line sits behind the canvas, which covers it once the app paints its first frame. */
-      #pdfcraft-loading, #pdfcraft-fallback { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; padding: 24px; text-align: center; }
-      #pdfcraft-loading { color: #7df7ff; letter-spacing: 0.04em; text-shadow: 0 0 12px #4dfcff; }
+      /* What the page is, shown while it loads: the canvas covers it once the app paints its first frame. */
+      #pdfcraft-loading, #pdfcraft-fallback { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 24px; text-align: center; }
+      #pdfcraft-loading h1 { margin: 0 0 8px; font-size: 28px; color: #f3eeff; }
+      #pdfcraft-loading p { margin: 4px 0; max-width: 36em; color: #c9bfe6; }
+      #pdfcraft-loading .status { margin-top: 16px; color: #7df7ff; letter-spacing: 0.04em; text-shadow: 0 0 12px #4dfcff; }
       #pdfcraft-fallback { z-index: 2; background: #0b0716; }
       #pdfcraft-fallback[hidden] { display: none; }
     </style>
   </head>
   <body>
-    <div id="pdfcraft-loading">Loading Compilo PDF…</div>
+    <div id="pdfcraft-loading">
+      <h1>Compilo PDF</h1>
+      <p>Compila e firma moduli PDF, modifica il testo, converti in Word, stampa e riconosci il testo delle scansioni (OCR), tutto nel browser.</p>
+      <p>Gratis e senza account: i file non vengono caricati su nessun server e restano sul tuo dispositivo.</p>
+      <p class="status">Caricamento di Compilo PDF…</p>
+    </div>
     <canvas id="pdfcraft"></canvas>
     <div id="pdfcraft-fallback" role="alert" hidden></div>
     <noscript>
       <div style="position: absolute; inset: 0; z-index: 3; display: flex; align-items: center; justify-content: center; padding: 24px; text-align: center; background: #0b0716;">
-        Compilo PDF needs JavaScript and a browser with WebGL turned on.
+        Compilo PDF ha bisogno di JavaScript e di un browser con WebGL attivo.
       </div>
     </noscript>
   </body>

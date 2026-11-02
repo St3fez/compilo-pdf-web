@@ -17,7 +17,8 @@ The web build is deliberately small. It fills in and signs a PDF, edits it, conv
 and recognizes the text of scanned pages (OCR); everything else PdfCraft does (combine, organize, comment,
 redact, protect, forms authoring and the rest) stays in the desktop app and is left out of the web menus,
 tool lists and search. Word is export only: there is no Word to PDF. OCR reads the open file, one page at a
-time: the browser gives it one thread, so the page pauses for a few seconds while each page is read. The
+time: the browser gives it one thread, so the page pauses while each page is read (about 7 seconds a page on
+a desktop computer, longer on a phone). The
 models read the Latin alphabet, as on the desktop. They are by Robert Knight (ocrs), licensed CC-BY-SA-4.0;
 the site carries their licence and credits in [models/](https://st3fez.github.io/compilo-pdf-web/models/ATTRIBUTION.txt).
 Signing with a PKCS #12 certificate stays desktop only.
@@ -27,6 +28,12 @@ tool pane, when opened, takes the screen instead of squeezing the page; picking 
 screen back to the page. The mode tabs become one menu and the search box a button, and dialogs fit the
 screen width and scroll when they are taller than it. Tablets and phones held sideways keep the full
 layout. In a browser on Android the Home links to the Compilo PDF app on Google Play.
+
+For search engines the page has an Italian title and description, a canonical address, Open Graph
+and Twitter tags with a preview image (`og-image.png`), schema.org `WebApplication` data, a site icon
+and a [sitemap](https://st3fez.github.io/compilo-pdf-web/sitemap.xml); the loading screen says in plain
+text what the app does. A project site cannot serve a `robots.txt` (search engines read it only at the
+domain's root), so the sitemap is submitted in Google Search Console instead.
 
 Compilo PDF is based on PdfCraft by the ArtCraft team. The code is MIT OR Apache-2.0: see
 [LICENSE-MIT](LICENSE-MIT), [LICENSE-APACHE](LICENSE-APACHE) and [NOTICE](NOTICE). The site carries them

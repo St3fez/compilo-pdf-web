@@ -26,13 +26,18 @@ const PROBE: usize = 48;
 const BRAND_URIS: &[&[u8]] = &[b"bytes://artcraft"];
 
 /// What `index.html` may not contain at all.
-const FORBIDDEN_IN_INDEX: &[&str] = &["http://", "https://", "=\"//", "='//", "url(//", "url(\"//", "url('//", "@import"];
+const FORBIDDEN_IN_INDEX: &[&str] = &["=\"//", "='//", "url(//", "url(\"//", "url('//", "@import"];
+
+/// The absolute addresses `index.html` may name, which search engines read and the page never
+/// fetches: the site's own (its canonical address and preview image) and schema.org, the vocabulary
+/// of its structured data. Each is a whole address or ends where a path begins.
+const INDEX_OWN_ADDRESSES: &[&str] = &["https://st3fez.github.io/compilo-pdf-web/", "https://schema.org"];
 
 pub fn run(args: &[String]) -> anyhow::Result<()> {
     let dir = gates::root().join(args.first().map_or("dist/web", String::as_str));
     let index = std::fs::read_to_string(dir.join("index.html")).with_context(|| format!("reading {}", dir.join("index.html").display()))?;
     let mut problems: Vec<String> = Vec::new();
-    if let Err(found) = check_index(&index) {
+    for found in [check_index(&index), check_own_files(&dir, &index)].into_iter().filter_map(Result::err) {
         problems.extend(found.into_iter().map(|p| format!("index.html: {p}")));
     }
     if let Err(found) = check_tree(&gates::root()) {
@@ -110,11 +115,41 @@ fn check_script(path: &Path) -> anyhow::Result<Vec<String>> {
 }
 
 /// `index.html` is ours (plus the loader Trunk injects, which uses relative paths): any absolute or
-/// protocol-relative address in it is a mistake.
+/// protocol-relative address in it but [`INDEX_OWN_ADDRESSES`] is a mistake.
 pub(crate) fn check_index(html: &str) -> Result<(), Vec<String>> {
-    let found: Vec<String> =
+    let mut found: Vec<String> =
         FORBIDDEN_IN_INDEX.iter().filter(|needle| html.contains(**needle)).map(|needle| format!("contains `{needle}`")).collect();
+    for scheme in ["http://", "https://"] {
+        for (at, _) in html.match_indices(scheme) {
+            let url = address_at(html.get(at..).unwrap_or_default());
+            let own =
+                |allowed: &&str| url.strip_prefix(*allowed).is_some_and(|rest| rest.is_empty() || allowed.ends_with('/') || rest.starts_with('/'));
+            if !INDEX_OWN_ADDRESSES.iter().any(own) {
+                found.push(format!("names `{}`", url.chars().take(80).collect::<String>()));
+            }
+        }
+    }
     if found.is_empty() { Ok(()) } else { Err(found) }
+}
+
+/// The files `index.html` names by the site's own address (its preview image): each must be in
+/// `site`, or what a search engine or a link preview shows is broken.
+pub(crate) fn check_own_files(site: &Path, html: &str) -> Result<(), Vec<String>> {
+    let Some(base) = INDEX_OWN_ADDRESSES.first() else { return Ok(()) };
+    let missing: Vec<String> = html
+        .match_indices(base)
+        .filter_map(|(at, _)| {
+            let path = address_at(html.get(at + base.len()..).unwrap_or_default());
+            (!path.is_empty() && !site.join(path).is_file()).then(|| format!("names {base}{path}, which the site lacks"))
+        })
+        .collect();
+    if missing.is_empty() { Ok(()) } else { Err(missing) }
+}
+
+/// The address at the start of `text`, up to the quote, space or bracket that ends it.
+fn address_at(text: &str) -> &str {
+    let end = text.find(['"', '\'', '`', ' ', ')', '<', '>', '\n']).unwrap_or(text.len());
+    text.get(..end).unwrap_or(text)
 }
 
 /// Generated JavaScript: every `http(s)://` address must start with one of [`NAMESPACE_PREFIXES`].
@@ -414,6 +449,33 @@ mod tests {
         assert!(check_wasm(&[], &brand()).is_ok());
         assert!(check_wasm(&[1u8; 16], &[]).is_ok(), "no images to look for");
         assert!(check_wasm(&[1u8; 16], &[("empty.svg".to_owned(), Vec::new())]).is_ok(), "an empty image matches nothing");
+    }
+
+    /// Search engines read the page's canonical address, its preview image and its structured data:
+    /// `index.html` may name the site's own address and schema.org's vocabulary, which the page never
+    /// fetches, and no other absolute address.
+    #[test]
+    fn index_may_name_only_the_site_s_own_address_and_schema_org() {
+        let html = r#"<link rel="canonical" href="https://st3fez.github.io/compilo-pdf-web/"><meta property="og:image" content="https://st3fez.github.io/compilo-pdf-web/og-image.png"><script type="application/ld+json">{"@context":"https://schema.org","@type":"WebApplication"}</script>"#;
+        assert!(check_index(html).is_ok(), "{:?}", check_index(html));
+        let problems = check_index(r#"<meta property="og:image" content="https://cdn.example.com/x.png">"#).unwrap_err();
+        assert!(problems.iter().any(|p| p.contains("cdn.example.com")), "{problems:?}");
+        for look_alike in
+            ["https://st3fez.github.io/compilo-pdf-web.evil.example/", "https://schema.org.evil.example/", "http://st3fez.github.io/compilo-pdf-web/"]
+        {
+            assert!(check_index(&format!(r#"<a href="{look_alike}">"#)).is_err(), "{look_alike} is not the site");
+        }
+    }
+
+    /// A file `index.html` names by the site's own address (the preview image) must be on the site.
+    #[test]
+    fn a_file_named_by_the_site_s_address_must_be_on_the_site() {
+        let site = scratch();
+        write(&site, "og-image.png", "png");
+        let html = r#"<link rel="canonical" href="https://st3fez.github.io/compilo-pdf-web/"><meta property="og:image" content="https://st3fez.github.io/compilo-pdf-web/og-image.png"><meta content="https://st3fez.github.io/compilo-pdf-web/gone.png">"#;
+        let problems = check_own_files(&site, html).unwrap_err();
+        assert!(problems.len() == 1 && problems[0].contains("gone.png"), "{problems:?}");
+        std::fs::remove_dir_all(site).unwrap();
     }
 
     #[test]
