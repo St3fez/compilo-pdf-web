@@ -333,6 +333,19 @@ fn the_web_ocr_panel_offers_recognize_text_with_no_desktop_mark() {
     assert!(!h.state().desktop_only("ocr.recognize"));
 }
 
+/// Search engines read the page's title after the app has started: the web Home keeps the one
+/// index.html gives, and a document names itself as before.
+#[test]
+fn the_web_home_keeps_the_page_title_search_engines_read() {
+    let index = std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/../../apps/pdfcraft-web/index.html")).unwrap();
+    assert!(index.contains(&format!("<title>{}</title>", web_profile::HOME_TITLE)), "index.html and HOME_TITLE disagree");
+    let mut h = harness(true);
+    assert_eq!(h.state().page_title, web_profile::HOME_TITLE);
+    h.state_mut().open_bytes("a.pdf", None, pdf()).unwrap();
+    h.run_steps(3);
+    assert_eq!(h.state().page_title, "a.pdf — Compilo PDF");
+}
+
 #[test]
 fn the_desktop_ocr_panel_has_no_download_link() {
     let mut h = harness(false);

@@ -12,6 +12,10 @@ use crate::theme::ThemePreference;
 /// The product name a visitor sees on the web.
 pub const NAME: &str = "Compilo PDF";
 
+/// The page's title on the web Home: the one `apps/pdfcraft-web/index.html` gives, which search
+/// engines read once the app has started. A document's page names the document instead.
+pub const HOME_TITLE: &str = "Compilo PDF – compila, firma e modifica PDF online gratis";
+
 /// The one place the web build still names PdfCraft and the ArtCraft team: the credit the licences
 /// ask for. It is shown as written, never through the catalogues, so it is not renamed.
 pub const CREDIT: &str = "Compilo PDF is based on PdfCraft by the ArtCraft team";

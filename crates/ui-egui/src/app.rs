@@ -47,8 +47,12 @@ impl PdfCraftApp {
         };
         let title = titled(self.active.and_then(|i| crate::canvas::tab_label(self, i)));
         // The web page's title is what an embedding host reads to tell which file opened, so it
-        // names the file even when the document asks to show its own title.
-        let page_title = titled(self.active.and_then(|i| self.views.get(i)).and_then(|v| self.session.get(v.id)).map(|d| d.name.clone()));
+        // names the file even when the document asks to show its own title. The web Home keeps the
+        // title search engines read.
+        let page_title = match self.active.and_then(|i| self.views.get(i)).and_then(|v| self.session.get(v.id)).map(|d| d.name.clone()) {
+            None if self.web_profile && !self.combine_showing() => crate::web_profile::HOME_TITLE.to_owned(),
+            name => titled(name),
+        };
         if title != self.window_title {
             ctx.send_viewport_cmd(egui::ViewportCommand::Title(title.clone()));
             self.window_title = title;

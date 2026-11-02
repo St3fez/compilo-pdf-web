@@ -101,7 +101,7 @@ fn main() {
 fn failure_text(error: &str) -> String {
     let detail: String = error.chars().filter(|c| !c.is_control()).take(120).collect();
     let detail = detail.trim();
-    let mut text = String::from("Compilo PDF could not start. It needs a browser with WebGL turned on.");
+    let mut text = String::from("Compilo PDF non è riuscito ad avviarsi: serve un browser con WebGL attivo.");
     if !detail.is_empty() {
         text.push_str(" (");
         text.push_str(detail);
@@ -110,11 +110,17 @@ fn failure_text(error: &str) -> String {
     text
 }
 
-/// Show `text` in the page's `#pdfcraft-fallback` box (as text, never as HTML) and drop the
-/// loading line.
+/// Show `text` (as text, never as HTML) in place of the loading line, under the page's description,
+/// which stays: a visitor, or a search engine, whose browser can't start the app still reads what it
+/// is. A page without that line shows it in its `#pdfcraft-fallback` box instead.
 #[cfg(target_arch = "wasm32")]
 fn show_fallback(text: &str) {
     let Some(document) = web_sys::window().and_then(|w| w.document()) else { return };
+    if let Some(status) = document.get_element_by_id("pdfcraft-status") {
+        status.set_text_content(Some(text));
+        let _ = status.set_attribute("role", "alert");
+        return;
+    }
     if let Some(loading) = document.get_element_by_id("pdfcraft-loading") {
         let _ = loading.set_attribute("hidden", "");
     }
