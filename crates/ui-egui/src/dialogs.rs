@@ -123,13 +123,14 @@ fn dialogs(app: &mut PdfCraftApp, ctx: &egui::Context) {
     }
     let mut req = Pending::default();
     let modal = widgets::show_modal(ctx, "dialog", |ui| {
-        ui.set_width(match dialog {
+        let wanted = match dialog {
             Dialog::Properties(_) => 640.0,
             Dialog::Print => 820.0,
             Dialog::FieldProps | Dialog::BulkFieldProps => 600.0,
             Dialog::About => 780.0,
             _ => 520.0,
-        });
+        };
+        ui.set_width(widgets::dialog_width(ui.ctx(), wanted));
         if dialog_body(ui, app, dialog, &mut req) {
             dialog_footer(ui, app, dialog, &mut req);
         }
@@ -356,7 +357,7 @@ fn dialog_body(ui: &mut egui::Ui, app: &mut PdfCraftApp, dialog: Dialog, req: &m
             return false;
         }
         Dialog::ActionWizard => {
-            ui.set_width(620.0);
+            ui.set_width(widgets::dialog_width(ui.ctx(), 620.0));
             req.close = crate::actions_ui::body(ui, app, &t);
             return false;
         }
@@ -367,12 +368,12 @@ fn dialog_body(ui: &mut egui::Ui, app: &mut PdfCraftApp, dialog: Dialog, req: &m
             return false;
         }
         Dialog::JsConsole => {
-            ui.set_width(640.0);
+            ui.set_width(widgets::dialog_width(ui.ctx(), 640.0));
             req.close = crate::js_ui::console_body(ui, app, &t);
             return false;
         }
         Dialog::DocumentJs => {
-            ui.set_width(640.0);
+            ui.set_width(widgets::dialog_width(ui.ctx(), 640.0));
             req.close = crate::js_ui::document_js_body(ui, app, &t);
             return false;
         }
@@ -401,7 +402,7 @@ fn dialog_body(ui: &mut egui::Ui, app: &mut PdfCraftApp, dialog: Dialog, req: &m
             return false;
         }
         Dialog::Marks(kind) => {
-            ui.set_width(720.0);
+            ui.set_width(widgets::dialog_width(ui.ctx(), 720.0));
             let (go, cancel) = crate::marks_ui::body(ui, app, &t, kind);
             req.apply = go;
             req.marks_now = req.apply;
@@ -1186,7 +1187,7 @@ fn dialog_duplicate_field(ui: &mut egui::Ui, app: &mut PdfCraftApp, req: &mut Pe
 /// `Dialog::CertificateViewer` content. Returns `false` when it has its own buttons and no footer is wanted.
 fn dialog_certificate_viewer(ui: &mut egui::Ui, app: &mut PdfCraftApp, req: &mut Pending) -> bool {
     let t = Tokens::get(ui.ctx());
-    ui.set_width(700.0);
+    ui.set_width(widgets::dialog_width(ui.ctx(), 700.0));
     let trusted = app.session.trusted_certificates().to_vec();
     let Some(v) = app.cert_viewer.as_mut() else {
         req.close = true;

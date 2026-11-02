@@ -114,9 +114,19 @@ pub struct Ocr {
 impl Ocr {
     pub fn load(models: &Models) -> Result<Ocr, OcrError> {
         let load = |p: &Path| rten::Model::load_file(p).map_err(|e| OcrError::Load(p.display().to_string(), e.to_string()));
+        Self::with_models(load(&models.detection)?, load(&models.recognition)?)
+    }
+
+    /// Load the models from their bytes: the browser build downloads them and has no files.
+    pub fn from_bytes(detection: Vec<u8>, recognition: Vec<u8>) -> Result<Ocr, OcrError> {
+        let load = |name: &str, bytes| rten::Model::load(bytes).map_err(|e| OcrError::Load(name.into(), e.to_string()));
+        Self::with_models(load(DETECTION_MODEL, detection)?, load(RECOGNITION_MODEL, recognition)?)
+    }
+
+    fn with_models(detection: rten::Model, recognition: rten::Model) -> Result<Ocr, OcrError> {
         let params = ocrs::OcrEngineParams {
-            detection_model: Some(load(&models.detection)?),
-            recognition_model: Some(load(&models.recognition)?),
+            detection_model: Some(detection),
+            recognition_model: Some(recognition),
             alphabet: Some(ALPHABET.into()),
             ..Default::default()
         };
@@ -441,6 +451,25 @@ mod tests {
         assert!(text.iter().any(|t| t.contains("HELL") && t.contains("WOR")), "{text:?}");
         let word = lines.iter().flat_map(|l| &l.words).find(|w| w.text.contains("HELL")).unwrap();
         assert!(word.rect[0] >= 10.0 && word.rect[0] < 60.0, "{word:?}");
+    }
+
+    /// The browser build has no model files: it loads the models from the bytes it downloaded. A
+    /// file that is no model is refused by name.
+    #[test]
+    fn loads_the_models_from_bytes() {
+        let refused = Ocr::from_bytes(b"not a model".to_vec(), b"nor this".to_vec()).err();
+        assert!(matches!(&refused, Some(OcrError::Load(what, _)) if what == DETECTION_MODEL), "{refused:?}");
+        let Some(models) = Models::find() else {
+            eprintln!("skipped: OCR models not installed");
+            return;
+        };
+        let read = |p: &Path| std::fs::read(p).unwrap();
+        let refused = Ocr::from_bytes(read(&models.detection), b"not a model".to_vec()).err();
+        assert!(matches!(&refused, Some(OcrError::Load(what, _)) if what == RECOGNITION_MODEL), "{refused:?}");
+        let ocr = Ocr::from_bytes(read(&models.detection), read(&models.recognition)).unwrap();
+        let (w, h, px) = test_image::hello();
+        let text: Vec<String> = ocr.recognize(&px, w, h).unwrap().iter().map(Line::text).collect();
+        assert!(text.iter().any(|t| t.contains("HELL") && t.contains("WOR")), "{text:?}");
     }
 
     mod test_image {

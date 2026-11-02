@@ -307,6 +307,8 @@ pub fn command(app: &mut PdfCraftApp, reset: bool, params: &Value) -> Result<Val
 
 struct Content<'a> {
     app: &'a mut PdfCraftApp,
+    /// On a phone, the width the one open pane takes: all of it (see [`open_panes`]).
+    full: Option<f32>,
 }
 
 impl PaneContent<Pane> for Content<'_> {
@@ -329,7 +331,7 @@ impl PaneContent<Pane> for Content<'_> {
     }
 
     fn default_state(&self, pane: &Pane) -> PaneState {
-        state_of(&self.app.side_panels, *pane)
+        state_of(&self.app.side_panels, *pane, self.full)
     }
 
     fn size_range(&self, pane: &Pane) -> RangeInclusive<f32> {
@@ -346,23 +348,22 @@ impl PaneContent<Pane> for Content<'_> {
     }
 }
 
-fn state_of(panels: &SidePanels, pane: Pane) -> PaneState {
+/// `pane` as it docks: at its own width, or at `full` (a phone).
+fn state_of(panels: &SidePanels, pane: Pane, full: Option<f32>) -> PaneState {
     let edge = match pane {
         Pane::Tools => panels.tools_edge(),
         Pane::Side => Edge::End,
     };
-    PaneState::docked(edge, panels.width(pane))
+    PaneState::docked(edge, full.unwrap_or_else(|| panels.width(pane)))
 }
-
-/// Below this width, in points, the web Home gives the whole page to its tiles.
-const WEB_HOME_NARROW: f32 = 600.0;
 
 /// The panes that show this frame, outermost first on a shared edge.
 fn open_panes(app: &PdfCraftApp, width: f32) -> Vec<Pane> {
     let mut open = Vec::new();
-    // The web Home has a tile for each tool, so on a screen this narrow the Tools pane would only
-    // take the width the tiles need.
-    let tiles_instead = app.web_profile && app.active.is_none() && width < WEB_HOME_NARROW;
+    let phone = app.web_profile && width < crate::web_profile::PHONE_WIDTH;
+    // The web Home has a tile for each tool, so on a phone the Tools pane would only take the width
+    // the tiles need.
+    let tiles_instead = phone && app.active.is_none();
     // Read mode hides the tools, not the navigation panes.
     if app.left_open && app.mode != Mode::Read && !tiles_instead {
         open.push(Pane::Tools);
@@ -370,6 +371,11 @@ fn open_panes(app: &PdfCraftApp, width: f32) -> Vec<Pane> {
     // Home and Combine files have no side panel; the choice is kept for the next document.
     if app.active.is_some() && app.right.is_some() {
         open.push(Pane::Side);
+    }
+    // A phone has room for one pane, and it takes the screen (`show`): beside it the page would be
+    // a sliver.
+    if phone {
+        open.truncate(1);
     }
     open
 }
@@ -387,13 +393,26 @@ pub fn show(app: &mut PdfCraftApp, ui: &mut egui::Ui) {
     if app.mode == Mode::AllTools && app.all_tools_full {
         return;
     }
-    let open = open_panes(app, ui.available_width());
+    let width = ui.available_width();
+    let phone = app.web_profile && width < crate::web_profile::PHONE_WIDTH;
+    // A phone opens a document on its page: the list of all tools waits until it is asked for. A
+    // tool picked on the Home before the file opened stays open, as everywhere.
+    let doc = app.active_ids().map(|(_, id)| id);
+    if phone && app.phone_doc != doc {
+        app.phone_doc = doc;
+        if doc.is_some() && app.left == crate::LeftPanel::AllTools {
+            app.left_open = false;
+        }
+    }
+    let open = open_panes(app, width);
     if open.is_empty() {
         return;
     }
     let t = crate::theme::Tokens::get(ui.ctx());
     let labels = PaneLabels { resize: crate::i18n::t("Resize panels").to_owned(), ..PaneLabels::default() };
     let panels = app.side_panels;
+    // On a phone the one pane takes the screen beside the rail; the page shows again once it closes.
+    let full = (phone && app.active.is_some()).then_some(width);
     // Columns: both panes may share the right edge, Tools outermost, as `open` lists them.
     let output = PaneHost::new(egui::Id::unique("pdfcraft-side-panels"))
         .policy(SidePolicy::Columns)
@@ -401,7 +420,7 @@ pub fn show(app: &mut PdfCraftApp, ui: &mut egui::Ui) {
         .labels(labels)
         .frame(egui::Frame::NONE.fill(t.panel))
         .body_margin(egui::Margin::ZERO)
-        .show(ui, &open, |pane| Some(state_of(&panels, *pane)), &mut Content { app });
+        .show(ui, &open, |pane| Some(state_of(&panels, *pane, full)), &mut Content { app, full });
     for request in output.requests {
         match request {
             PaneRequest::Resize(pane, width) => app.side_panels.set_width(pane, width),

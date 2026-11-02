@@ -1,5 +1,6 @@
 //! `cargo xtask web-check [dist-dir]`: the built web site loads nothing from another origin, carries no
-//! ArtCraft image and ships its licence documents. `cargo xtask web-licences` puts those beside it.
+//! ArtCraft image and ships its licence documents and its OCR models. `cargo xtask web-licences` puts
+//! the documents beside it, `cargo xtask models dist/web/models` the models.
 //!
 //! The site is a static page on GitHub Pages and has to work offline once loaded, with no CDN, font
 //! host or tracker. `index.html` may not name any absolute URL, and the generated JavaScript may
@@ -40,6 +41,11 @@ pub fn run(args: &[String]) -> anyhow::Result<()> {
     if let Err(found) = check_notices(&dir, &license_documents(&gates::root())?) {
         problems.extend(found);
     }
+    let manifest = crate::assets::load(&gates::root())?;
+    let models: Vec<(String, String)> = manifest.fetched.iter().filter(|f| f.kind == "model").map(|f| (f.file.clone(), f.sha256.clone())).collect();
+    if let Err(found) = check_models(&dir, &models) {
+        problems.extend(found);
+    }
     let images = brand_images()?;
     let (mut scripts, mut modules) = (0usize, 0usize);
     for entry in std::fs::read_dir(&dir).with_context(|| format!("listing {}", dir.display()))? {
@@ -57,11 +63,15 @@ pub fn run(args: &[String]) -> anyhow::Result<()> {
         }
     }
     if !problems.is_empty() {
-        bail!("the built site is not self-contained, carries brand images or lacks its licence documents:\n  {}", problems.join("\n  "));
+        bail!(
+            "the built site is not self-contained, carries brand images or lacks its licence documents or OCR models:\n  {}",
+            problems.join("\n  ")
+        );
     }
     println!(
-        "web-check: index.html, {scripts} script(s) and {modules} wasm module(s) in {} name no outside address and carry no ArtCraft image; the licence documents are beside them",
-        dir.display()
+        "web-check: index.html, {scripts} script(s) and {modules} wasm module(s) in {} name no outside address and carry no ArtCraft image; the licence documents and the {} OCR model(s) with their licences are beside them",
+        dir.display(),
+        models.len()
     );
     Ok(())
 }
@@ -174,6 +184,30 @@ pub(crate) fn check_notices(site: &Path, documents: &[(String, String)]) -> Resu
     if missing.is_empty() { Ok(()) } else { Err(missing) }
 }
 
+/// The text recognition models in `site/models/`, where Recognize text downloads them from: each of
+/// `models` (`(file, sha256)` from ATTRIBUTION.toml) as pinned, with its licence beside it, and the
+/// credits their licence asks for (`cargo xtask models` writes all three).
+pub(crate) fn check_models(site: &Path, models: &[(String, String)]) -> Result<(), Vec<String>> {
+    let dir = site.join("models");
+    let present = |name: &str| std::fs::metadata(dir.join(name)).is_ok_and(|m| m.is_file() && m.len() > 0);
+    let mut problems = Vec::new();
+    for (file, sha256) in models {
+        match std::fs::read(dir.join(file)) {
+            Ok(bytes) if crate::assets::sha256_hex(&bytes) == *sha256 => {}
+            Ok(_) => problems.push(format!("models/{file}: SHA-256 does not match ATTRIBUTION.toml")),
+            Err(_) => problems.push(format!("the model models/{file} is missing (run `cargo xtask models dist/web/models`)")),
+        }
+        let licence = format!("{file}.LICENCE.txt");
+        if !present(&licence) {
+            problems.push(format!("the licence models/{licence} is missing or empty"));
+        }
+    }
+    if !present("ATTRIBUTION.txt") {
+        problems.push("the credits models/ATTRIBUTION.txt are missing or empty".to_owned());
+    }
+    if problems.is_empty() { Ok(()) } else { Err(problems) }
+}
+
 /// Copies the licence documents (`(source, destination)` pairs of `LICENSES.toml`) from the checkout
 /// `root` into `site`, as the release zip does with `copy_docs`; returns how many files it wrote.
 pub(crate) fn copy_notices(root: &Path, site: &Path, documents: &[(String, String)]) -> anyhow::Result<usize> {
@@ -284,6 +318,26 @@ mod tests {
         let root = scratch();
         assert!(brand_images_in(&root.join("docs/brand")).unwrap().is_empty());
         std::fs::remove_dir_all(root).unwrap();
+    }
+
+    /// Recognize text downloads its models from `models/` beside the page: they must be there, as
+    /// ATTRIBUTION.toml pins them, with their CC-BY-SA licence and the credits it asks for.
+    #[test]
+    fn a_site_without_its_ocr_models_their_licences_or_credits_is_rejected() {
+        let site = scratch();
+        let models = [("text-detection.onnx".to_owned(), crate::assets::sha256_hex(b"model"))];
+        let problems = check_models(&site, &models).unwrap_err();
+        for missing in ["models/text-detection.onnx", "models/text-detection.onnx.LICENCE.txt", "models/ATTRIBUTION.txt"] {
+            assert!(problems.iter().any(|p| p.contains(missing)), "{missing} not reported: {problems:?}");
+        }
+        write(&site, "models/text-detection.onnx", "another model");
+        write(&site, "models/text-detection.onnx.LICENCE.txt", "Attribution-ShareAlike 4.0 International");
+        write(&site, "models/ATTRIBUTION.txt", "credits");
+        let problems = check_models(&site, &models).unwrap_err();
+        assert!(problems.len() == 1 && problems[0].contains("SHA-256"), "{problems:?}");
+        write(&site, "models/text-detection.onnx", "model");
+        assert!(check_models(&site, &models).is_ok());
+        std::fs::remove_dir_all(site).unwrap();
     }
 
     #[test]

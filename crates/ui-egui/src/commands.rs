@@ -111,7 +111,14 @@ impl PdfCraftApp {
     /// open documents, keeps running. Edits are applied to a copy, so the document is unchanged.
     pub fn execute(&mut self, id: &str) -> bool {
         match pdfcraft_engine::guard(|| self.execute_unguarded(id)) {
-            Ok(done) => done,
+            Ok(done) => {
+                // A phone shows one pane at a time over the page: a tool picked from it hands the
+                // screen back to the page it works on.
+                if done && self.phone_layout() && crate::web_profile::is_offered_tool(id) {
+                    self.left_open = false;
+                }
+                done
+            }
             Err(m) => {
                 self.notify_fmt("That didn't work: an internal error stopped it ({m}). Your documents are unchanged.", &[("m", m.as_str())]);
                 true

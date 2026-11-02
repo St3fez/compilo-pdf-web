@@ -33,12 +33,40 @@ pub fn modal(ctx: &egui::Context, id: impl std::hash::Hash + std::fmt::Debug) ->
     egui::Modal::new(egui::Id::unique(id)).frame(dialog_frame(ctx))
 }
 
-/// Show [`modal`], outline its controls, and remember the card rect for layout checks.
+/// The least room a dialog keeps between its card and the edges of the screen.
+const DIALOG_EDGE: f32 = 8.0;
+
+/// How wide a dialog's content may be on this screen: `wanted`, or less on a narrow one (a phone),
+/// so that the card and its buttons stay on the screen.
+pub fn dialog_width(ctx: &egui::Context, wanted: f32) -> f32 {
+    let room = ctx.content_rect().width() - 2.0 * (f32::from(DIALOG_PAD_X) + DIALOG_EDGE);
+    wanted.min(room.max(160.0))
+}
+
+/// Show [`modal`], outline its controls, and remember the card rect for layout checks. Content
+/// taller or wider than the screen (a phone) scrolls, so every button in it can be reached.
 pub fn show_modal<R>(ctx: &egui::Context, id: &str, content: impl FnOnce(&mut egui::Ui) -> R) -> egui::ModalResponse<R> {
     let stored = egui::Id::unique(id);
+    let screen = ctx.content_rect().size();
+    let room = vec2(screen.x - 2.0 * (f32::from(DIALOG_PAD_X) + DIALOG_EDGE), screen.y - 2.0 * (f32::from(DIALOG_PAD_Y) + DIALOG_EDGE));
+    // The content's own size, measured last frame: a scrolled dialog is smaller than its content.
+    let natural = stored.with("natural");
+    let size = ctx.data(|d| d.get_temp::<egui::Vec2>(natural));
+    let (wide, tall) = size.map_or((false, false), |s| (s.x > room.x + 0.5, s.y > room.y));
     modal(ctx, id).show(ctx, |ui| {
         begin_dialog(ui);
-        let inner = content(ui);
+        // Always inside the scroll area, scrolling or not, so that the widgets keep their ids (a
+        // dialog's tab, say) when it starts or stops scrolling.
+        let mut area = egui::ScrollArea::new([wide, tall]).id_salt(stored.with("scroll"));
+        if wide {
+            area = area.max_width(room.x.max(80.0));
+        }
+        if tall {
+            area = area.max_height(room.y.max(80.0));
+        }
+        let scrolled = area.show(ui, content);
+        ui.ctx().data_mut(|d| d.insert_temp(natural, scrolled.content_size));
+        let inner = scrolled.inner;
         // The frame's stroke sits outside this content rect; the stored card is the fill.
         let card = ui.min_rect().expand2(egui::vec2(f32::from(DIALOG_PAD_X), f32::from(DIALOG_PAD_Y)));
         ui.ctx().data_mut(|d| d.insert_temp(stored.with("card"), card));
@@ -109,11 +137,20 @@ pub(crate) fn paint_left(ui: &egui::Ui, pos: egui::Pos2, text: &str, font: egui:
 }
 
 /// A mode-bar tab: text with an underline when active.
+/// The font of a [`mode_tab`].
+fn mode_tab_font(active: bool) -> egui::FontId {
+    if active { theme::semibold(13.5) } else { theme::medium(13.5) }
+}
+
+/// The width a [`mode_tab`] labelled `label` takes.
+pub(crate) fn mode_tab_width(ui: &egui::Ui, label: &str, active: bool) -> f32 {
+    text_width(ui, label, &mode_tab_font(active)) + 22.0
+}
+
 pub fn mode_tab(ui: &mut egui::Ui, label: &str, active: bool) -> Response {
     let t = Tokens::get(ui.ctx());
-    let font = if active { theme::semibold(13.5) } else { theme::medium(13.5) };
-    let w = ui.fonts_mut(|f| f.layout_no_wrap(label.to_owned(), font.clone(), t.text).size().x);
-    let (rect, resp) = ui.allocate_exact_size(vec2(w + 22.0, 48.0), Sense::click());
+    let font = mode_tab_font(active);
+    let (rect, resp) = ui.allocate_exact_size(vec2(mode_tab_width(ui, label, active), 48.0), Sense::click());
     resp.widget_info(|| egui::WidgetInfo::selected(egui::Role::Button, ui.is_enabled(), active, label));
     let press = theme::Press::track(ui, &resp);
     let well = rect.shrink2(vec2(2.0, 9.0));

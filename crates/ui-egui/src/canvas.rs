@@ -3489,8 +3489,9 @@ fn apply_frame_requests(app: &mut PdfCraftApp, index: usize, ui: &mut egui::Ui, 
         app.execute("edit.copy");
     }
     // Read mode hides the tools (#2646), and full screen is the page and nothing else (#1459);
-    // the quick tools come back with the window.
-    if app.mode != crate::Mode::Read && !app.full_screen {
+    // the quick tools come back with the window. A pane covering the page (a phone) hides them too:
+    // they would float over the rail.
+    if app.mode != crate::Mode::Read && !app.full_screen && avail.width() >= 80.0 {
         quick_bar(app, avail, ui);
     }
     if let Some((source, file, destination)) = remote_open {

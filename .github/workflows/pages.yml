@@ -43,6 +43,10 @@ jobs:
         run: trunk build --release
       - name: Add the licence documents
         run: cargo xtask web-licences
+      # Recognize text downloads these from beside the page the first time it runs: the two models
+      # pinned by SHA-256 in ATTRIBUTION.toml, each with its CC-BY-SA-4.0 licence, and the credits.
+      - name: Add the text recognition models
+        run: cargo xtask models dist/web/models
       - name: Check the site is self-contained and carries no ArtCraft mark
         run: cargo xtask web-check
       - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0

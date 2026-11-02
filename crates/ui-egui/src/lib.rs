@@ -473,6 +473,13 @@ pub struct PdfCraftApp {
     pub ocr_draft: ocr_ui::OcrDraft,
     pub ocr_run: Option<ocr_ui::OcrRun>,
     pub ocr_batch: Option<std::sync::Arc<std::sync::Mutex<ocr_ui::BatchProgress>>>,
+    /// The web build's recogniser, from the models it downloads the first time.
+    pub web_ocr: ocr_ui::WebOcr,
+    /// The web build runs in a browser on Android, which can install the Compilo PDF app: its Home
+    /// suggests it ([`web_profile::PLAY_STORE_URL`]).
+    pub android: bool,
+    /// The document a phone last showed: a new one opens on its page, not beside the tool list.
+    pub(crate) phone_doc: Option<pdfcraft_engine::DocId>,
     /// Background jobs (OCR, actions, listing pinned folders) run inline instead (tests).
     pub run_inline: bool,
     /// Action Wizard: the user's actions, the dialog state, the running action and (tests) the

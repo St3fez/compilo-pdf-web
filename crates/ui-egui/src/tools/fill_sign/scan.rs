@@ -227,7 +227,9 @@ pub(super) fn scan_tab(
             }
         }
     });
-    let (area, resp) = ui.allocate_exact_size(vec2(460.0, 230.0), Sense::drag());
+    // As wide as the dialog allows on a narrow screen (a phone), keeping its shape.
+    let w = 460.0_f32.min(ui.available_width()).max(120.0);
+    let (area, resp) = ui.allocate_exact_size(vec2(w, w * 0.5), Sense::drag());
     let painter = ui.painter_at(area);
     painter.rect_filled(area, CornerRadius::same(6), t.pasteboard);
     painter.rect_stroke(area, CornerRadius::same(6), Stroke::new(1.0, t.border), egui::StrokeKind::Inside);
@@ -356,7 +358,7 @@ pub(super) fn scan_tab(
         }
     });
     ui.add_space(4.0);
-    let (rect, _) = ui.allocate_exact_size(vec2(460.0, 110.0), Sense::hover());
+    let (rect, _) = ui.allocate_exact_size(vec2(460.0_f32.min(ui.available_width()).max(120.0), 110.0), Sense::hover());
     ui.painter().rect_filled(rect, CornerRadius::same(6), Color32::WHITE);
     ui.painter().rect_stroke(rect, CornerRadius::same(6), Stroke::new(1.0, t.border), egui::StrokeKind::Inside);
     if let Some(image) = &d.image {

@@ -148,6 +148,31 @@ fn a_failed_open_clears_the_picked_tool() {
     assert_ne!(h.state().left, LeftPanel::Tool("edit"), "a later file must not start Edit");
 }
 
+/// In a browser on Android the web Home suggests the Compilo PDF app on Google Play and links to its
+/// store page; on an iPhone or a computer it does not, and neither does the desktop Home.
+#[test]
+fn the_web_home_suggests_the_android_app_only_on_android() {
+    for (web, android) in [(true, true), (true, false), (false, true)] {
+        let mut h = Harness::builder().with_size(egui::vec2(412.0, 915.0)).build_eframe(move |_cc| {
+            let mut app = PdfCraftApp::new();
+            if web {
+                app.set_web_profile();
+            }
+            app.android = android;
+            app.set_option("language", "en").unwrap();
+            app
+        });
+        h.run_steps(4);
+        let link = h.query_by_label(pdfcraft_ui_egui::web_profile::PLAY_STORE_LABEL);
+        assert_eq!(link.is_some(), web && android, "web profile: {web}, Android: {android}");
+        if let Some(link) = link {
+            let screen = egui::Rect::from_min_size(egui::Pos2::ZERO, egui::vec2(412.0, 915.0));
+            assert!(screen.contains_rect(link.rect()), "the link {:?} is on the first screen", link.rect());
+        }
+    }
+    assert!(pdfcraft_ui_egui::web_profile::PLAY_STORE_URL.starts_with("https://play.google.com/store/apps/details?id=com.pdfcraft.pdfcraft_mobile"));
+}
+
 #[test]
 fn home_fits_a_360_wide_phone() {
     let size = egui::vec2(360.0, 640.0);

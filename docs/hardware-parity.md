@@ -34,12 +34,13 @@ printing are counted in their feature areas). **Platforms ≈ 70% ready, 15–30
 | Windows (x64, x86, ARM64) | yes (x64, ARM64) | yes | signed installers | — |
 | Linux | no | yes | AppImage, deb, rpm, Flatpak, tarball | Chinese faces in Flatpak (#689) |
 | FreeBSD | no | yes | package | — |
-| Web | Acrobat online (cloud) | yes (WASM, offline in the browser) | static site, deployed to GitHub Pages by `.github/workflows/pages.yml` in the Compilo PDF fork | OCR, crash recovery, PKCS #12 signing (the web build marks the OCR and signing commands "Desktop app only" and links to the desktop app) |
+| Web | Acrobat online (cloud) | yes (WASM, offline in the browser; Recognize text downloads its models from the same site the first time) | static site, deployed to GitHub Pages by `.github/workflows/pages.yml` in the Compilo PDF fork | OCR in multiple files, crash recovery, PKCS #12 signing (the web build leaves them out or marks them "Desktop app only"); Recognize text reads one page a frame on the page's only thread |
 
 ## Revision history
 
 | Date | Change | Summary |
 |---|---|---|
+| 2026-11-02 | minor | Web row: Recognize text runs in the browser, with the models downloaded from the site on first use |
 | 2026-11-01 | minor | Web row: a hosted deployment (the Compilo PDF fork on GitHub Pages) leaves the gap list; the web build marks its three missing features as desktop-only |
 | 2026-10-11 | minor | Web printers row: printing through the browser's print dialog (gap 4 closed); Web platform row no longer lists printing |
 | 2026-10-10 | major | Created from the code, `vendor/README.md`, `.github/workflows/release.yml`, the print crate's README and user issues |

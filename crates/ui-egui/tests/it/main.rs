@@ -79,6 +79,7 @@ mod ui;
 mod updates;
 mod view;
 mod viewer;
+mod web_devices;
 mod web_home;
 mod web_profile;
 mod xfa;

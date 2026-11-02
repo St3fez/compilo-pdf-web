@@ -184,8 +184,8 @@ fn tool_detail(app: &mut PdfCraftApp, ui: &mut egui::Ui, t: &Tokens, g: &'static
             );
         });
     }
-    // The browser build cannot run some of this tool's items: say so, and say where to get them.
-    if g.sections.iter().any(|s| s.items.iter().any(|i| app.desktop_only(i.command))) {
+    // The browser build cannot run some of the items this tool lists: say so, and say where to get them.
+    if g.sections.iter().flat_map(|s| s.items).any(|i| app.desktop_only(i.command) && !app.hides_tool(g.id, i.command)) {
         ui.hyperlink_to(crate::web_profile::DOWNLOAD_LABEL, crate::web_profile::DOWNLOAD_URL);
         ui.add_space(6.0);
     }

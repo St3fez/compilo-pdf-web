@@ -20,11 +20,12 @@ pub const CREDIT: &str = "Compilo PDF is based on PdfCraft by the ArtCraft team"
 /// page and to the upstream repository, and the update check, which opens the desktop releases.
 pub const HIDDEN_HELP: &[&str] = &["help.discord", "help.website", "help.app_page", "help.github", "help.check_updates"];
 
-/// The commands that do not run in the browser build: OCR and signing with a PKCS #12 certificate
-/// (docs/hardware-parity.md, Web row). Crash recovery is the third gap, but it is an automatic
-/// start-up dialog, not a command, so it has no id here.
-pub const DESKTOP_ONLY: &[&str] =
-    &["ocr.recognize", "ocr.recognize_batch", "ocr.enhance_camera", "sign.digital", "sign.certify", "sign.certify_invisible"];
+/// The commands that do not run in the browser build: recognizing text in multiple files (it reads
+/// the models from disk), enhancing a camera image, and signing with a PKCS #12 certificate
+/// (docs/hardware-parity.md, Web row). Recognize text runs: it downloads its models from the site.
+/// Crash recovery is the other gap, but it is an automatic start-up dialog, not a command, so it has
+/// no id here.
+pub const DESKTOP_ONLY: &[&str] = &["ocr.recognize_batch", "ocr.enhance_camera", "sign.digital", "sign.certify", "sign.certify_invisible"];
 
 /// The tool groups the web build offers: filling and signing, editing, converting to Word, and OCR.
 /// Printing is File ▸ Print, which no group lists. Every other group is left out of the Home, the
@@ -96,6 +97,16 @@ pub const DOWNLOAD_URL: &str = "https://github.com/storytold/pdfcraft/releases";
 /// and never goes through the catalogues, which the web build renames.
 pub const DOWNLOAD_LABEL: &str = "Get the PdfCraft desktop app";
 
+/// Below this width, in points, the web build lays itself out for a phone: one pane at a time,
+/// taking the screen instead of squeezing the page, and closed once a tool is picked in it.
+pub const PHONE_WIDTH: f32 = 600.0;
+
+/// The store page of the Compilo PDF app for Android, which the web Home suggests on Android.
+pub const PLAY_STORE_URL: &str = "https://play.google.com/store/apps/details?id=com.pdfcraft.pdfcraft_mobile";
+
+/// The link to [`PLAY_STORE_URL`].
+pub const PLAY_STORE_LABEL: &str = "On Android? Get the Compilo PDF app on Google Play";
+
 /// What the app calls itself: [`NAME`] on the web profile, "PdfCraft" otherwise.
 pub(crate) fn product_name(web_profile: bool) -> &'static str {
     if web_profile { NAME } else { "PdfCraft" }
@@ -106,6 +117,10 @@ impl PdfCraftApp {
     /// the Neon default.
     pub fn set_web_profile(&mut self) {
         self.web_profile = true;
+        #[cfg(target_arch = "wasm32")]
+        {
+            self.android = web_sys::window().and_then(|w| w.navigator().user_agent().ok()).is_some_and(|agent| agent.contains("Android"));
+        }
         crate::i18n::set_product_name(NAME);
         if self.theme_preference == ThemePreference::System {
             self.set_theme_preference(ThemePreference::Neon);
@@ -115,6 +130,11 @@ impl PdfCraftApp {
     /// Whether `command` is one the web profile cannot run (see [`DESKTOP_ONLY`]).
     pub fn desktop_only(&self, command: &str) -> bool {
         self.web_profile && DESKTOP_ONLY.contains(&command)
+    }
+
+    /// Whether the web build is laid out for a phone this frame (see [`PHONE_WIDTH`]).
+    pub(crate) fn phone_layout(&self) -> bool {
+        self.web_profile && self.ctx.as_ref().is_some_and(|ctx| ctx.content_rect().width() < PHONE_WIDTH)
     }
 
     /// Whether the web build leaves the tool group `id` out of its lists (see [`GROUPS`]).

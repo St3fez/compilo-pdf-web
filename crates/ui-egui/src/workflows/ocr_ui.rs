@@ -1,12 +1,71 @@
 //! Scan & OCR ▸ Recognize text: the Recognize Text dialog (pages, language, output, resolution)
 //! and the background run with its progress. Recognition happens on a worker thread; the result
 //! is applied as one undoable edit when it is done.
+//!
+//! The web build has no model files and one thread: its first run downloads the models from the
+//! site, from the `models/` folder beside the page, and it reads one page a frame ([`PageSteps`]).
 
+use std::collections::VecDeque;
 use std::sync::{Arc, Mutex};
 
 use egui::{Align, Layout};
 use pdfcraft_engine::DocId;
-use pdfcraft_engine::ocr::{LANGUAGES, OcrPage, OcrSettings};
+use pdfcraft_engine::ocr::{LANGUAGES, Ocr, OcrJob, OcrPage, OcrSettings};
+
+/// A download of the two models (detection, recognition): empty while it runs, then what arrived.
+pub type ModelDownload = Arc<Mutex<Option<Result<(Vec<u8>, Vec<u8>), String>>>>;
+
+/// The web build's recogniser, made from the models it downloads the first time text is recognized
+/// and kept for the visit.
+#[derive(Default)]
+pub struct WebOcr {
+    pub engine: Option<Arc<Ocr>>,
+    /// The download, while it runs.
+    pub download: Option<ModelDownload>,
+    /// The run asked for during the download: the document, its pages and settings. It starts once
+    /// the models are in.
+    waiting: Option<(DocId, Vec<usize>, OcrSettings)>,
+}
+
+/// A run in the web build, which has one thread: one page a frame, so the page pauses for a page at
+/// a time, not for the whole file, and the progress shows between pages.
+pub struct PageSteps {
+    ocr: Arc<Ocr>,
+    jobs: VecDeque<OcrJob>,
+    found: Vec<OcrPage>,
+    /// The frame the run started in. Its first page waits for a later frame, so the progress is on
+    /// screen before the page pauses.
+    started: Option<u64>,
+}
+
+impl PageSteps {
+    /// In frame `frame`: read the next page, or end the run once every page is read or it was
+    /// cancelled.
+    fn step(&mut self, progress: &Mutex<OcrProgress>, frame: Option<u64>) {
+        if frame.is_some() && frame == self.started {
+            return;
+        }
+        let Ok(mut s) = progress.lock() else { return };
+        if s.result.is_some() {
+            return;
+        }
+        if !s.cancel
+            && let Some(job) = self.jobs.pop_front()
+        {
+            match recognize_guarded(|| Ok(job.run(&self.ocr, |_, _| true))) {
+                Ok(pages) => self.found.extend(pages),
+                Err(e) => {
+                    s.result = Some(Err(e));
+                    return;
+                }
+            }
+            s.done += 1;
+        }
+        if s.cancel || self.jobs.is_empty() {
+            s.result = Some(Ok(std::mem::take(&mut self.found)));
+        }
+    }
+}
 
 use crate::theme::{self, Tokens};
 use crate::{PdfCraftApp, widgets};
@@ -78,6 +137,8 @@ pub struct OcrRun {
     /// when it found no words (a page with text of its own is skipped, and Edit must not make noise),
     /// and its result waits for Read mode and dialogs and is dropped if the document changed.
     pub automatic: Option<AutoOcr>,
+    /// The web build's pages still to read, one a frame; `None` for a run on a worker thread.
+    pub steps: Option<PageSteps>,
 }
 
 /// What an Edit-started run needs to know to refuse a result that no longer fits its document.
@@ -92,7 +153,9 @@ pub struct AutoOcr {
 
 pub(crate) fn body(ui: &mut egui::Ui, app: &mut PdfCraftApp, t: &Tokens) -> (bool, bool) {
     let pages = app.active_ids().and_then(|(_, id)| app.session.get(id)).map_or(1, |d| d.info.pages.len().max(1));
-    let available = pdfcraft_engine::ocr::available();
+    // The web build has no model files: it downloads them from the site when they are needed.
+    let available = app.web_profile || pdfcraft_engine::ocr::available();
+    let first_on_web = app.web_profile && app.web_ocr.engine.is_none();
     let d = &mut app.ocr_draft;
     d.to = d.to.clamp(1, pages);
     d.from = d.from.clamp(1, d.to);
@@ -118,24 +181,29 @@ pub(crate) fn body(ui: &mut egui::Ui, app: &mut PdfCraftApp, t: &Tokens) -> (boo
         });
     });
     group(ui, "Settings", &mut |ui| {
+        // Narrower on a phone, so the labels and the choices share its width.
+        let combo_w = (ui.available_width() - 160.0).clamp(110.0, 220.0);
         egui::Grid::new("ocr-settings").num_columns(2).spacing([12.0, 8.0]).show(ui, |ui| {
             ui.label(tl!("Document language"));
             let name = LANGUAGES.iter().find(|l| l.0 == d.language).map_or("English", |l| l.1);
-            craft_ui::ComboBox::from_id_salt("ocr-language").selected_text(tl!(name)).width(220.0).show_ui(ui, |ui| {
+            craft_ui::ComboBox::from_id_salt("ocr-language").selected_text(tl!(name)).width(combo_w).truncate().show_ui(ui, |ui| {
                 for (code, name) in LANGUAGES {
                     ui.selectable_value(&mut d.language, (*code).to_string(), tl!(*name));
                 }
             });
             ui.end_row();
             ui.label(tl!("Output"));
-            craft_ui::ComboBox::from_id_salt("ocr-output").selected_text(tl!("Searchable Image (Exact)")).width(220.0).show_ui(ui, |ui| {
-                let _ = ui
-                    .selectable_label(true, tl!("Searchable Image (Exact)"))
-                    .on_hover_text(tl!("Adds invisible text over each word; the page image is not changed"));
-            });
+            craft_ui::ComboBox::from_id_salt("ocr-output").selected_text(tl!("Searchable Image (Exact)")).width(combo_w).truncate().show_ui(
+                ui,
+                |ui| {
+                    let _ = ui
+                        .selectable_label(true, tl!("Searchable Image (Exact)"))
+                        .on_hover_text(tl!("Adds invisible text over each word; the page image is not changed"));
+                },
+            );
             ui.end_row();
             ui.label(tl!("Downsample to"));
-            craft_ui::ComboBox::from_id_salt("ocr-dpi").selected_text(format!("{} dpi", d.dpi)).width(220.0).show_ui(ui, |ui| {
+            craft_ui::ComboBox::from_id_salt("ocr-dpi").selected_text(format!("{} dpi", d.dpi)).width(combo_w).truncate().show_ui(ui, |ui| {
                 for v in [600, 300, 150, 72] {
                     ui.selectable_value(&mut d.dpi, v, format!("{v} dpi"));
                 }
@@ -151,6 +219,16 @@ pub(crate) fn body(ui: &mut egui::Ui, app: &mut PdfCraftApp, t: &Tokens) -> (boo
             egui::RichText::new(tl!("Text recognition isn't installed: its model files are missing. Reinstall PdfCraft, or set PDFCRAFT_MODELS to the folder that holds them."))
                 .small()
                 .color(t.text_muted),
+        );
+        ui.add_space(6.0);
+    }
+    if first_on_web {
+        ui.label(
+            egui::RichText::new(tl!(
+                "The first time, the text recognition models (12 MB) are downloaded from this site. Pages are read one at a time, and the page pauses while each is read."
+            ))
+            .small()
+            .color(t.text_muted),
         );
         ui.add_space(6.0);
     }
@@ -201,7 +279,9 @@ impl PdfCraftApp {
     /// is one undoable step, "Recognize text", and is not run again for that page after Undo.
     pub(crate) fn auto_ocr_scanned_page(&mut self) {
         let Some(scan) = self.scan_to_read() else { return };
-        if !pdfcraft_engine::ocr::available() {
+        // The web build reads with the models Recognize text downloaded: Edit downloads nothing.
+        let ready = if self.web_profile { self.web_ocr.engine.is_some() } else { pdfcraft_engine::ocr::available() };
+        if !ready {
             self.views[scan.view].auto_ocr_skipped.insert(scan.page, scan.generation);
             return;
         }
@@ -267,6 +347,24 @@ impl PdfCraftApp {
         } else {
             None
         };
+        if self.web_profile {
+            let Some(ocr) = self.web_ocr.engine.clone() else {
+                // Edit's own runs wait for models Recognize text has downloaded.
+                if !automatic {
+                    self.download_ocr_models(id, pages, settings);
+                }
+                return;
+            };
+            let Some(count) = self.session.get(id).map(|d| d.info.pages.len()) else { return };
+            let wanted: Vec<usize> = if pages.is_empty() { (0..count).collect() } else { pages.iter().copied().filter(|p| *p < count).collect() };
+            let jobs: VecDeque<OcrJob> = wanted.iter().filter_map(|&page| self.session.ocr_job(id, &[page], settings.clone())).collect();
+            let progress = Arc::new(Mutex::new(OcrProgress { total: jobs.len(), ..Default::default() }));
+            let started = self.ctx.as_ref().map(egui::Context::cumulative_frame_nr);
+            let steps = PageSteps { ocr, jobs, found: Vec::new(), started };
+            self.ocr_run = Some(OcrRun { doc: id, progress, automatic: auto, steps: Some(steps) });
+            self.poll_ocr();
+            return;
+        }
         let Some(job) = self.session.ocr_job(id, pages, settings) else { return };
         let progress = Arc::new(Mutex::new(OcrProgress { total: job.pages.len(), ..Default::default() }));
         let p = progress.clone();
@@ -296,8 +394,45 @@ impl PdfCraftApp {
         }
         #[cfg(target_arch = "wasm32")]
         work();
-        self.ocr_run = Some(OcrRun { doc: id, progress, automatic: auto });
+        self.ocr_run = Some(OcrRun { doc: id, progress, automatic: auto, steps: None });
         self.poll_ocr();
+    }
+
+    /// The web build's first Recognize text: download the models from the site, then read `pages`
+    /// of `id` ([`Self::poll_ocr_models`]). Asking again during the download changes what is read.
+    fn download_ocr_models(&mut self, id: DocId, pages: &[usize], settings: OcrSettings) {
+        self.web_ocr.waiting = Some((id, pages.to_vec(), settings));
+        if self.web_ocr.download.is_some() {
+            return;
+        }
+        let download = ModelDownload::default();
+        // Only the web build turns the web profile on; elsewhere (tests) the caller fills the download.
+        #[cfg(target_arch = "wasm32")]
+        fetch_models(download.clone(), self.ctx.clone());
+        self.web_ocr.download = Some(download);
+        self.notify_tr("Downloading the text recognition models (12 MB)…");
+    }
+
+    /// Once the models' download is in: load them and start the run that waited for them, or say
+    /// why it failed.
+    fn poll_ocr_models(&mut self) {
+        let Some(download) = self.web_ocr.download.clone() else { return };
+        let arrived = match download.lock() {
+            Ok(mut slot) => slot.take(),
+            Err(e) => Some(Err(e.to_string())),
+        };
+        let Some(arrived) = arrived else { return };
+        self.web_ocr.download = None;
+        let waiting = self.web_ocr.waiting.take();
+        match arrived.and_then(|(detection, recognition)| Ocr::from_bytes(detection, recognition).map_err(|e| e.to_string())) {
+            Ok(ocr) => {
+                self.web_ocr.engine = Some(Arc::new(ocr));
+                if let Some((id, pages, settings)) = waiting {
+                    self.start_ocr_pages(id, &pages, settings, false);
+                }
+            }
+            Err(e) => self.notify_fmt("Couldn't download the text recognition models: {e}", &[("e", &e)]),
+        }
     }
 
     /// Recognize text in each file, writing the searchable copies into a folder the user picks
@@ -415,6 +550,13 @@ impl PdfCraftApp {
 
     /// Show progress; apply the result once the worker is done.
     pub(crate) fn poll_ocr(&mut self) {
+        self.poll_ocr_models();
+        let frame = self.ctx.as_ref().map(egui::Context::cumulative_frame_nr);
+        if let Some(run) = self.ocr_run.as_mut()
+            && let Some(steps) = run.steps.as_mut()
+        {
+            steps.step(&run.progress, frame);
+        }
         if let Some(b) = self.ocr_batch.clone() {
             let msg = b.lock().map(|mut s| s.message.take().ok_or((s.done, s.total))).map_err(|e| e.to_string());
             match msg {
@@ -537,6 +679,44 @@ fn failed(e: &str) -> String {
     crate::i18n::fmt(tl!("{label} failed: {e}"), &[("label", tl!("Recognize text")), ("e", e)])
 }
 
+/// Where the web build downloads the text recognition models from: the folder beside its page, which
+/// the site's build fills (`cargo xtask models dist/web/models`, with the models' licences).
+#[cfg(target_arch = "wasm32")]
+const WEB_MODELS: &str = "models/";
+
+/// Download the two models from [`WEB_MODELS`] into `download`, then wake the app.
+#[cfg(target_arch = "wasm32")]
+fn fetch_models(download: ModelDownload, ctx: Option<egui::Context>) {
+    wasm_bindgen_futures::spawn_local(async move {
+        let models = match fetch_model(pdfcraft_engine::ocr::DETECTION_MODEL).await {
+            Ok(detection) => fetch_model(pdfcraft_engine::ocr::RECOGNITION_MODEL).await.map(|recognition| (detection, recognition)),
+            Err(e) => Err(e),
+        };
+        if let Ok(mut slot) = download.lock() {
+            *slot = Some(models);
+        }
+        if let Some(ctx) = ctx {
+            ctx.request_repaint();
+        }
+    });
+}
+
+/// One model file, from beside the page.
+#[cfg(target_arch = "wasm32")]
+async fn fetch_model(name: &'static str) -> Result<Vec<u8>, String> {
+    use wasm_bindgen::JsCast;
+    let text = |e: wasm_bindgen::JsValue| e.as_string().unwrap_or_else(|| format!("{e:?}"));
+    let url = format!("{WEB_MODELS}{name}");
+    let window = web_sys::window().ok_or("no window")?;
+    let response = wasm_bindgen_futures::JsFuture::from(window.fetch_with_str(&url)).await.map_err(text)?;
+    let response: web_sys::Response = response.dyn_into().map_err(text)?;
+    if !response.ok() {
+        return Err(format!("{url}: HTTP {}", response.status()));
+    }
+    let buffer = wasm_bindgen_futures::JsFuture::from(response.array_buffer().map_err(text)?).await.map_err(text)?;
+    Ok(js_sys::Uint8Array::new(&buffer).to_vec())
+}
+
 /// `recognize`, with a panic in it (a damaged model, a page the recognizer can't take) turned into
 /// the run's error: the run has to end either way, or it refuses every later one (#3919).
 fn recognize_guarded<T>(recognize: impl FnOnce() -> Result<T, String>) -> Result<T, String> {
@@ -634,7 +814,7 @@ mod tests {
             let generation = app.session.get(app.active_ids().unwrap().1).unwrap().edit_generation();
             let page = pdfcraft_engine::ocr::OcrPage { page: 0, words: vec![word()], already_on_page: 0, skipped: None };
             let progress = Arc::new(Mutex::new(OcrProgress { done: 1, total: 1, result: Some(Ok(vec![page])), cancel: false }));
-            OcrRun { doc: app.active_ids().unwrap().1, progress, automatic: automatic.then_some(AutoOcr { page: 0, generation }) }
+            OcrRun { doc: app.active_ids().unwrap().1, progress, automatic: automatic.then_some(AutoOcr { page: 0, generation }), steps: None }
         };
         let label = |app: &PdfCraftApp| app.session.get(app.active_ids().unwrap().1).unwrap().can_undo().map(String::from);
 
@@ -674,7 +854,7 @@ mod tests {
             skipped: None,
         };
         let progress = Arc::new(Mutex::new(OcrProgress { done: 1, total: 1, result: Some(Ok(vec![page])), cancel: false }));
-        app.ocr_run = Some(OcrRun { doc: id, progress, automatic: Some(AutoOcr { page: 0, generation }) });
+        app.ocr_run = Some(OcrRun { doc: id, progress, automatic: Some(AutoOcr { page: 0, generation }), steps: None });
         app.views[0].auto_ocr_tried.insert(0);
         // The document changes while the run is out.
         let mut png = std::io::Cursor::new(Vec::new());
@@ -714,7 +894,7 @@ mod tests {
         app.set_option("language", "en").unwrap();
         let progress = Arc::new(Mutex::new(OcrProgress { total: 3, ..Default::default() }));
         poison(&progress);
-        app.ocr_run = Some(OcrRun { doc: DocId(1), progress, automatic: None });
+        app.ocr_run = Some(OcrRun { doc: DocId(1), progress, automatic: None, steps: None });
         app.poll_ocr();
         assert!(app.ocr_run.is_none(), "the next run isn't refused as already running");
         let toast = app.toast.take().map(|t| t.0).unwrap_or_default();

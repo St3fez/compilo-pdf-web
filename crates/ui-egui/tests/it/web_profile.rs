@@ -317,17 +317,20 @@ fn the_command_search_finds_only_what_the_web_build_offers() {
     }
 }
 
+/// Recognize text runs in the browser (it downloads its models from the site), and the OCR items
+/// that do not are left out, so the panel marks nothing as desktop only.
 #[test]
-fn the_ocr_panel_marks_its_desktop_only_items_and_links_to_the_download_on_web() {
+fn the_web_ocr_panel_offers_recognize_text_with_no_desktop_mark() {
     let mut h = harness(true);
     h.state_mut().open_bytes("a.pdf", None, pdf()).unwrap();
     h.state_mut().left = pdfcraft_ui_egui::LeftPanel::Tool("scan");
     h.state_mut().left_open = true;
     h.run_steps(4);
-    h.get_by_label(web_profile::DOWNLOAD_LABEL);
+    assert!(h.query_by_label(web_profile::DOWNLOAD_LABEL).is_none(), "every item the panel lists runs in the browser");
     h.get_by_label("In this file").hover();
     h.run_steps(4);
-    h.get_by_label_contains("Desktop app only");
+    assert!(h.query_by_label_contains("Desktop app only").is_none());
+    assert!(!h.state().desktop_only("ocr.recognize"));
 }
 
 #[test]

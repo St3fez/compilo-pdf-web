@@ -46,6 +46,13 @@ pub fn show(app: &mut PdfCraftApp, ui: &mut egui::Ui) {
                     .color(t.text_muted)
                     .font(theme::regular(13.0)),
             );
+            // A browser on Android can install the Compilo PDF app instead. The store opens in a new
+            // tab, so the files open here stay open.
+            if app.android {
+                ui.add_space(8.0);
+                let label = egui::RichText::new(tl!(crate::web_profile::PLAY_STORE_LABEL)).font(theme::semibold(14.0));
+                ui.add(egui::Hyperlink::from_label_and_url(label, crate::web_profile::PLAY_STORE_URL).open_in_new_tab(true));
+            }
             ui.add_space(18.0);
             drop_zone(app, ui, &t);
             ui.add_space(22.0);

@@ -638,7 +638,7 @@ pub(crate) fn signature_pad(
     if d.image_mode {
         ui.label(egui::RichText::new(tl!("Choose a PNG or JPEG image (up to 4 MiB). Transparency is preserved.")).color(t.text_muted));
         let browse = crate::widgets::ghost_button(ui, "folder", tl!("Browse…")).clicked();
-        let (rect, _) = ui.allocate_exact_size(vec2(460.0, 150.0), Sense::hover());
+        let (rect, _) = ui.allocate_exact_size(pad_size(ui), Sense::hover());
         ui.painter().rect_filled(rect, CornerRadius::same(6), Color32::WHITE);
         ui.painter().rect_stroke(rect, CornerRadius::same(6), Stroke::new(1.0, t.border), egui::StrokeKind::Inside);
         if let Some(image) = &d.image {
@@ -652,11 +652,11 @@ pub(crate) fn signature_pad(
         ui.add(
             egui::TextEdit::singleline(&mut d.text)
                 .char_limit(pdfcraft_engine::MAX_SIGNATURE_CHARS)
-                .desired_width(460.0)
+                .desired_width(pad_size(ui).x)
                 .hint_text(tl!(if d.initials { "Initials" } else { "Your name" })),
         )
         .labelled_by(l.id);
-        let (rect, _) = ui.allocate_exact_size(vec2(460.0, 150.0), Sense::hover());
+        let (rect, _) = ui.allocate_exact_size(pad_size(ui), Sense::hover());
         let painter = ui.painter_at(rect);
         painter.rect_filled(rect, CornerRadius::same(6), Color32::WHITE);
         painter.rect_stroke(rect, CornerRadius::same(6), Stroke::new(1.0, t.border), egui::StrokeKind::Inside);
@@ -678,7 +678,7 @@ pub(crate) fn signature_pad(
         d.undo_stroke();
     }
     let strokes = &mut d.strokes;
-    let (rect, resp) = ui.allocate_exact_size(vec2(460.0, 150.0), Sense::drag());
+    let (rect, resp) = ui.allocate_exact_size(pad_size(ui), Sense::drag());
     let painter = ui.painter_at(rect);
     painter.rect_filled(rect, CornerRadius::same(6), Color32::WHITE);
     painter.rect_stroke(rect, CornerRadius::same(6), Stroke::new(1.0, t.border), egui::StrokeKind::Inside);
@@ -702,6 +702,12 @@ pub(crate) fn signature_pad(
     }
     let (apply, cancel) = pad_buttons(ui, d);
     (apply, cancel, false)
+}
+
+/// The signature pad: 460 by 150 points, or narrower with the same shape on a narrow screen (a phone).
+fn pad_size(ui: &egui::Ui) -> egui::Vec2 {
+    let w = 460.0_f32.min(ui.available_width()).max(120.0);
+    vec2(w, w * 150.0 / 460.0)
 }
 
 fn image_texture(ui: &egui::Ui, image: &SignatureImage, cache: &mut Option<(SavedSig, egui::TextureHandle)>) -> egui::TextureId {

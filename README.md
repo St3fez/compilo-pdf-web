@@ -2,8 +2,10 @@
 
 **Compilo PDF** is PdfCraft running in your browser: the real editor, compiled to WebAssembly, in a neon
 theme. Your PDFs never leave your computer. There is no server and no upload: once the page has loaded it
-makes no further requests, so it keeps working if the network goes away. There is no service worker, so
-reloading it while offline works only while the browser still holds its cache (GitHub Pages sets ten minutes).
+makes no further requests, so it keeps working if the network goes away. The one exception is the first
+time you recognize text (OCR): it then downloads its two text recognition models, 12 MB, from the same
+site. There is no service worker, so reloading it while offline works only while the browser still holds
+its cache (GitHub Pages sets ten minutes).
 
 Open it: <https://st3fez.github.io/compilo-pdf-web/>
 
@@ -12,10 +14,19 @@ Pages serves it compressed); the scripts are 26 KB. With the files cached the ed
 second.
 
 The web build is deliberately small. It fills in and signs a PDF, edits it, converts it to Word, prints it
-and has an OCR tool; everything else PdfCraft does (combine, organize, comment, redact, protect, forms
-authoring and the rest) stays in the desktop app and is left out of the web menus, tool lists and search.
-Word is export only: there is no Word to PDF. OCR does not run in the browser yet, so the web build marks
-it "Desktop app only", as it does signing with a PKCS #12 certificate.
+and recognizes the text of scanned pages (OCR); everything else PdfCraft does (combine, organize, comment,
+redact, protect, forms authoring and the rest) stays in the desktop app and is left out of the web menus,
+tool lists and search. Word is export only: there is no Word to PDF. OCR reads the open file, one page at a
+time: the browser gives it one thread, so the page pauses for a few seconds while each page is read. The
+models read the Latin alphabet, as on the desktop. They are by Robert Knight (ocrs), licensed CC-BY-SA-4.0;
+the site carries their licence and credits in [models/](https://st3fez.github.io/compilo-pdf-web/models/ATTRIBUTION.txt).
+Signing with a PKCS #12 certificate stays desktop only.
+
+On a phone held upright (narrower than 600 points) the layout changes. A document opens on its page, and a
+tool pane, when opened, takes the screen instead of squeezing the page; picking a tool in it gives the
+screen back to the page. The mode tabs become one menu and the search box a button, and dialogs fit the
+screen width and scroll when they are taller than it. Tablets and phones held sideways keep the full
+layout. In a browser on Android the Home links to the Compilo PDF app on Google Play.
 
 Compilo PDF is based on PdfCraft by the ArtCraft team. The code is MIT OR Apache-2.0: see
 [LICENSE-MIT](LICENSE-MIT), [LICENSE-APACHE](LICENSE-APACHE) and [NOTICE](NOTICE). The site carries them

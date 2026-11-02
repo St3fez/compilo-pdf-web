@@ -348,3 +348,104 @@ fn only_the_edit_tool_recognizes_a_scanned_page() {
     h.run_steps(6);
     assert_eq!(h.state().session.get(id).unwrap().can_undo(), None);
 }
+
+/// The web build: Compilo PDF in the browser, with no model files on disk.
+fn web_harness(pdf: Vec<u8>) -> Harness<'static, PdfCraftApp> {
+    let mut h = Harness::builder().with_size(egui::vec2(1400.0, 900.0)).build_eframe(move |_cc| {
+        let mut app = PdfCraftApp::new();
+        app.set_web_profile();
+        app.set_option("language", "en").unwrap();
+        app.open_bytes("scan.pdf", None, pdf).unwrap();
+        app
+    });
+    h.run_steps(4);
+    h
+}
+
+/// Open Recognize Text and press its button.
+fn recognize_on_the_web(h: &mut Harness<'static, PdfCraftApp>) {
+    assert!(h.state_mut().execute("ocr.recognize"), "Recognize text runs in the browser");
+    h.run_steps(2);
+    h.get_by_label("Recognize text").click();
+    h.run_steps(2);
+}
+
+/// What the site serves under `models/`: the files `cargo xtask models` installs.
+fn site_models() -> Option<(Vec<u8>, Vec<u8>)> {
+    let m = pdfcraft_engine::ocr::Models::find()?;
+    Some((std::fs::read(m.detection).ok()?, std::fs::read(m.recognition).ok()?))
+}
+
+fn toast(h: &Harness<'static, PdfCraftApp>) -> String {
+    h.state().toast.clone().map(|t| t.0).unwrap_or_default()
+}
+
+/// The web build has no model files: its first Recognize text downloads them from its own site and
+/// then reads the pages one a frame, so the progress shows between pages. The models stay loaded.
+#[test]
+fn the_web_build_downloads_its_models_then_reads_a_page_at_a_time() {
+    let mut s = Session::new();
+    let pages = s.open("scan.pdf", None, scan().into(), None).unwrap();
+    let png = export::Exporter::new(s.get(pages).unwrap()).png(0, 150.0).unwrap();
+    let two_pages = s.create_from_images(&[("one.png".into(), png.clone()), ("two.png".into(), png)]).unwrap().to_vec();
+    let mut h = web_harness(two_pages);
+    assert!(h.state_mut().execute("ocr.recognize"));
+    h.run_steps(2);
+    h.get_by_label_contains("downloaded from this site");
+    h.get_by_label("Recognize text").click();
+    h.run_steps(2);
+    assert!(toast(&h).starts_with("Downloading the text recognition models"), "{}", toast(&h));
+    assert!(h.state().ocr_run.is_none(), "nothing is read before the models are in");
+    let Some(models) = site_models() else {
+        eprintln!("skipped: OCR models not installed");
+        return;
+    };
+    // The browser's download arrives.
+    *h.state().web_ocr.download.clone().expect("downloading").lock().unwrap() = Some(Ok(models));
+    let mut shown_between_pages = false;
+    for _ in 0..40 {
+        h.run_steps(1);
+        let Some(run) = &h.state().ocr_run else { break };
+        shown_between_pages |= run.progress.lock().unwrap().done == 1;
+    }
+    assert!(h.state().ocr_run.is_none(), "finished");
+    assert!(shown_between_pages, "a frame was drawn after the first page and before the second");
+    assert!(toast(&h).starts_with("Recognized ") && toast(&h).contains("on 2 pages"), "{}", toast(&h));
+    let id = h.state().active_ids().unwrap().1;
+    assert_eq!(h.state().session.get(id).unwrap().can_undo(), Some("Recognize text"));
+    // A second run needs no download.
+    h.state_mut().undo();
+    recognize_on_the_web(&mut h);
+    assert!(h.state().web_ocr.download.is_none(), "the models were kept");
+    for _ in 0..40 {
+        h.run_steps(1);
+        if h.state().ocr_run.is_none() {
+            break;
+        }
+    }
+    assert_eq!(h.state().session.get(id).unwrap().can_undo(), Some("Recognize text"));
+}
+
+/// A download that fails says so and leaves nothing running, and asking again downloads again.
+#[test]
+fn a_failed_model_download_says_so_and_can_be_tried_again() {
+    let mut h = web_harness(scan());
+    recognize_on_the_web(&mut h);
+    let download = h.state().web_ocr.download.clone().expect("downloading");
+    *download.lock().unwrap() = Some(Err("models/text-detection.onnx: HTTP 404".into()));
+    h.run_steps(2);
+    assert!(toast(&h).contains("text recognition models") && toast(&h).contains("HTTP 404"), "{}", toast(&h));
+    assert!(h.state().web_ocr.download.is_none() && h.state().ocr_run.is_none());
+    recognize_on_the_web(&mut h);
+    assert!(h.state().web_ocr.download.is_some(), "asked again, it downloads again");
+}
+
+/// Edit on a scanned page does not start a download of its own on the web: it waits until the
+/// models are loaded.
+#[test]
+fn editing_a_scan_on_the_web_downloads_nothing() {
+    let mut h = web_harness(scan());
+    assert!(h.state_mut().execute("edit.edit_text"));
+    h.run_steps(6);
+    assert!(h.state().web_ocr.download.is_none() && h.state().ocr_run.is_none());
+}

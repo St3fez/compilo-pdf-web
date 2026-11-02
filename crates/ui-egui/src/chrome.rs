@@ -506,10 +506,20 @@ pub fn mode_bar(app: &mut PdfCraftApp, ui: &mut egui::Ui) {
                 }
                 // Acrobat's mode bar has no Read tab: reading is what the viewer does with no tool
                 // in use. Read mode (the panes hidden) stays a View command and a default workspace.
-                for (mode, label) in [(Mode::AllTools, "All tools"), (Mode::Edit, "Edit"), (Mode::Convert, "Convert"), (Mode::Sign, "E-Sign")] {
-                    if widgets::mode_tab(ui, tl!(label), app.mode == mode).clicked() {
-                        app.switch_mode(mode, true);
+                // What fits, widest first: the four tabs and the search box; the tabs and a search
+                // button (a tablet upright); a menu of the modes and a search button (a phone).
+                let tabs_w: f32 = MODES.iter().map(|(mode, label)| widgets::mode_tab_width(ui, tl!(label), app.mode == *mode) + 2.0).sum();
+                let room = ui.available_width();
+                let search_box = room >= tabs_w + 8.0 + DOC_BUTTONS_W + 8.0 + SEARCH_W + 4.0;
+                let right_w = DOC_BUTTONS_W + if search_box { 8.0 + SEARCH_W + 4.0 } else { 4.0 + 32.0 };
+                if room >= tabs_w + 8.0 + right_w {
+                    for (mode, label) in MODES {
+                        if widgets::mode_tab(ui, tl!(label), app.mode == mode).clicked() {
+                            app.switch_mode(mode, true);
+                        }
                     }
+                } else {
+                    mode_menu(app, ui, room - right_w - 8.0);
                 }
                 ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                     ui.spacing_mut().item_spacing.x = 4.0;
@@ -534,13 +544,58 @@ pub fn mode_bar(app: &mut PdfCraftApp, ui: &mut egui::Ui) {
                             app.dialog = Some(Dialog::Properties(PropsTab::Description));
                         }
                     });
-                    ui.add_space(8.0);
-                    if widgets::search_box(ui, tl!("Find tools and commands"), 260.0).clicked() {
+                    let search = if search_box {
+                        ui.add_space(8.0);
+                        widgets::search_box(ui, tl!("Find tools and commands"), SEARCH_W)
+                    } else {
+                        icons::button(ui, "search", 32.0, false, tl!("Find tools and commands"))
+                    };
+                    if search.clicked() {
                         app.palette_open = true;
                     }
                 });
             });
         });
+}
+
+/// The workspaces the mode bar switches between, as tabs or as [`mode_menu`].
+const MODES: [(Mode, &str); 4] = [(Mode::AllTools, "All tools"), (Mode::Edit, "Edit"), (Mode::Convert, "Convert"), (Mode::Sign, "E-Sign")];
+/// The width of the mode bar's search box.
+const SEARCH_W: f32 = 260.0;
+/// The width of the mode bar's document buttons: properties, save and print.
+const DOC_BUTTONS_W: f32 = 3.0 * 32.0 + 2.0 * 4.0;
+
+/// The modes as one button, no wider than `width`, that opens a menu of them: for a mode bar too
+/// narrow for their tabs (a phone).
+fn mode_menu(app: &mut PdfCraftApp, ui: &mut egui::Ui, width: f32) {
+    let t = Tokens::get(ui.ctx());
+    let current = MODES.iter().find(|(mode, _)| *mode == app.mode).map_or_else(|| tl!("Read mode"), |(_, label)| tl!(label));
+    let font = theme::semibold(13.5);
+    let width = width.clamp(48.0, widgets::text_width(ui, current, &font) + 44.0);
+    let (rect, resp) = ui.allocate_exact_size(vec2(width, 48.0), egui::Sense::click());
+    resp.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, ui.is_enabled(), current));
+    let press = theme::Press::track(ui, &resp);
+    press.wash(ui, rect.shrink2(vec2(2.0, 9.0)), 6, false);
+    let body = rect.translate(press.offset());
+    widgets::paint_left(ui, body.left_center() + vec2(10.0, 0.0), current, font, t.text, width - 34.0);
+    icons::paint(ui, Rect::from_center_size(body.right_center() - vec2(14.0, 0.0), vec2(14.0, 14.0)), "chevron-down", 14.0, t.text_muted);
+    let underline = Rect::from_min_max(rect.left_bottom() + vec2(10.0, -2.0), rect.right_bottom() - vec2(10.0, 0.0));
+    ui.painter().rect_filled(underline, egui::CornerRadius { nw: 1, ne: 1, sw: 0, se: 0 }, t.accent);
+    let chosen = egui::Popup::menu(&theme::hand(resp))
+        .show(|ui| {
+            ui.set_min_width(180.0);
+            let mut chosen = None;
+            for (mode, label) in MODES {
+                if ui.selectable_label(app.mode == mode, tl!(label)).clicked() {
+                    chosen = Some(mode);
+                }
+            }
+            chosen
+        })
+        .and_then(|r| r.inner);
+    if let Some(mode) = chosen {
+        app.switch_mode(mode, true);
+    }
 }
 
 /// Draw the right tool rail with page navigation, history, zoom, rotation and page-display controls for the

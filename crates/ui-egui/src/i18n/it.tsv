@@ -2811,3 +2811,7 @@ certificate	SHA-256 digest	Impronta SHA-256
 	Options for this reply	Opzioni per questa risposta
 	Export value	Valore di esportazione
 	Show Page Edge Shadows	Mostra le ombre ai bordi delle pagine
+	The first time, the text recognition models (12 MB) are downloaded from this site. Pages are read one at a time, and the page pauses while each is read.	La prima volta i modelli di riconoscimento del testo (12 MB) vengono scaricati da questo sito. Le pagine vengono lette una alla volta e la pagina si ferma mentre ognuna viene letta.
+	Downloading the text recognition models (12 MB)…	Download dei modelli di riconoscimento del testo (12 MB)…
+	Couldn't download the text recognition models: {e}	Impossibile scaricare i modelli di riconoscimento del testo: {e}
+	On Android? Get the Compilo PDF app on Google Play	Usi Android? Scarica l'app Compilo PDF da Google Play
