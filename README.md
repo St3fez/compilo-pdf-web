@@ -10,19 +10,11 @@ OCR, crash recovery and signing with a PKCS #12 certificate need the desktop app
 "Desktop app only".
 
 Compilo PDF is based on PdfCraft by the ArtCraft team. The code is MIT OR Apache-2.0: see
-[LICENSE-MIT](LICENSE-MIT), [LICENSE-APACHE](LICENSE-APACHE) and [NOTICE](NOTICE).
+[LICENSE-MIT](LICENSE-MIT), [LICENSE-APACHE](LICENSE-APACHE) and [NOTICE](NOTICE). The site carries them
+too, with the licences of the fonts and other third-party material it embeds: open
+[NOTICE](https://st3fez.github.io/compilo-pdf-web/NOTICE) and the `licenses/` folder next to it.
 
 ---
-
-<p align="center">
-  <a href="https://getartcraft.com/">
-    <picture>
-      <source media="(prefers-color-scheme: dark)" srcset="docs/brand/artcraft-logo-white.svg">
-      <img alt="ArtCraft" src="docs/brand/artcraft-logo.svg" width="200">
-    </picture>
-  </a>
-</p>
-
 
 <p align="center">
   <img src="assets/app-icon/hicolor/256x256/apps/ai.storyteller.pdfcraft.png" width="128" height="128" alt="PdfCraft icon: an engraved lion on a red tile">
@@ -46,16 +38,6 @@ Compilo PDF is based on PdfCraft by the ArtCraft team. The code is MIT OR Apache
   <a href="https://coderabbit.ai"><img alt="Reviewed by CodeRabbit" src="https://img.shields.io/coderabbit/prs/github/storytold/pdfcraft?style=flat-square&label=Reviewed%20by%20CodeRabbit&logo=coderabbit"></a>
 </p>
 
-<p align="center">
-  <a href="https://discord.gg/artcraft"><img alt="Join the ArtCraft community on Discord" src="https://img.shields.io/badge/Join%20us%20on%20Discord-5865F2?style=for-the-badge&logo=discord&logoColor=white" height="40"></a>
-</p>
-
-<p align="center">
-  <a href="https://getartcraft.com/apps/pdfcraft"><b>PdfCraft on getartcraft.com</b></a> ·
-  <a href="https://getartcraft.com/">ArtCraft</a> ·
-  <a href="https://getartcraft.com/apps">All Crafting Apps</a>
-</p>
-
 <br>
 
 <p align="center">
@@ -63,10 +45,6 @@ Compilo PDF is based on PdfCraft by the ArtCraft team. The code is MIT OR Apache
   <br>
   <sub>The PdfCraft Showcase, a 13-page specimen PDF, open with the All tools panel and threaded comments.</sub>
 </p>
-
-> [!NOTE]
-> **ArtCraft is a community of artists from all walks of life.** Digital, generative, music,
-> games &mdash; if you make things, you're one of us. **[Come say hi on Discord](https://discord.gg/artcraft).**
 
 <p align="center">
   <a href="#highlights">Highlights</a> ·
@@ -81,21 +59,17 @@ Compilo PDF is based on PdfCraft by the ArtCraft team. The code is MIT OR Apache
   <a href="#how-its-built">How it's built</a> ·
   <a href="#get-started">Get started</a> ·
   <a href="#whats-next">What's next</a> ·
-  <a href="#downloads">Downloads</a> ·
-  <a href="#the-crafting-apps">Crafting Apps</a>
+  <a href="#downloads">Downloads</a>
 </p>
 
 ---
 
-## Community
+## Where this comes from
 
-PdfCraft is part of [ArtCraft](https://getartcraft.com). Come say hello, get help and follow development:
-
-- **Discord: [discord.gg/artcraft](https://discord.gg/artcraft)**. This is the fastest way to get help and share feedback. The app has a Discord button in its title bar.
-- **Web page:** [getartcraft.com/apps/pdfcraft](https://getartcraft.com/apps/pdfcraft)
-- **Source:** [github.com/storytold/pdfcraft](https://github.com/storytold/pdfcraft)
-
-The ArtCraft name and logos in `docs/brand/` are trademarks of the ArtCraft Team and are not open source. They may be used only unmodified, and only as part of PdfCraft (see `docs/brand/LICENSE-brand.txt`). Forks and modified versions must remove them.
+This repository is a modified copy of [PdfCraft](https://github.com/storytold/pdfcraft), an open-source
+project by the ArtCraft team and the PdfCraft contributors. The changes here are not theirs, this is not
+an ArtCraft product, and the ArtCraft wordmark and mark are not part of it. The original project, its
+releases and its community are at [github.com/storytold/pdfcraft](https://github.com/storytold/pdfcraft).
 
 ## Highlights
 
@@ -273,16 +247,11 @@ Documents restricted by their author show a clear notice, and PdfCraft honours t
 
 Press <kbd>⌘K</kbd> to search every tool and command, or browse the **All tools** catalogue. Tools that are still in development are marked with the milestone that will ship them.
 
-<table>
-<tr>
-<td width="50%"><img src="docs/images/pdfcraft-palette.png" alt="The command palette searching for 'page', listing Page grid, Page labels, Rotate pages, Insert pages, Delete pages, Extract pages and more, each with the tool it belongs to"></td>
-<td width="50%"><img src="docs/images/pdfcraft-tools.png" alt="The Welcome to PdfCraft home screen with recommended tools, a recent file, a privacy note, and the full tool catalogue in the side panel"></td>
-</tr>
-<tr>
-<td align="center"><sub>The <kbd>⌘K</kbd> command palette</sub></td>
-<td align="center"><sub>The home screen and the All tools catalogue</sub></td>
-</tr>
-</table>
+<p align="center">
+  <img src="docs/images/pdfcraft-palette.png" alt="The command palette searching for 'page', listing Page grid, Page labels, Rotate pages, Insert pages, Delete pages, Extract pages and more, each with the tool it belongs to" width="60%">
+  <br>
+  <sub>The <kbd>⌘K</kbd> command palette</sub>
+</p>
 
 ---
 
@@ -551,66 +520,21 @@ Every other Linux build needs glibc 2.35 or newer (Ubuntu 22.04+, Debian 12+, Fe
 
 ---
 
-## The Crafting Apps
-
-PdfCraft is one of the **Crafting Apps**: free, open-source creative tools from the
-[ArtCraft](https://getartcraft.com/) team, each written from scratch in Rust and each able to
-stand on its own.
-
-| | App | What it's for | Code | Learn more |
-|:-:|---|---|---|---|
-| <img src="https://raw.githubusercontent.com/storytold/photocraft/main/assets/app-icon/hicolor/64x64/apps/ai.storyteller.photocraft.png" alt="" width="32" height="32"> | **PhotoCraft** | Image editing: layers, masks, type and real PSD files | [GitHub](https://github.com/storytold/photocraft) | [Website](https://getartcraft.com/apps/photocraft) |
-| <img src="https://raw.githubusercontent.com/storytold/vectorcraft/main/assets/app-icon/hicolor/64x64/apps/ai.storyteller.vectorcraft.png" alt="" width="32" height="32"> | **VectorCraft** | Vector illustration | [GitHub](https://github.com/storytold/vectorcraft) | [Website](https://getartcraft.com/apps/vectorcraft) |
-| <img src="https://raw.githubusercontent.com/storytold/filmcraft/main/assets/app-icon/hicolor/64x64/apps/ai.storyteller.filmcraft.png" alt="" width="32" height="32"> | **FilmCraft** | Video editing, color and sound | [GitHub](https://github.com/storytold/filmcraft) | [Website](https://getartcraft.com/apps/filmcraft) |
-| <img src="https://raw.githubusercontent.com/storytold/lightcraft/main/assets/app-icon/hicolor/64x64/apps/ai.storyteller.lightcraft.png" alt="" width="32" height="32"> | **LightCraft** | Photo library and raw development | [GitHub](https://github.com/storytold/lightcraft) | [Website](https://getartcraft.com/apps/lightcraft) |
-| <img src="https://raw.githubusercontent.com/storytold/pdfcraft/main/assets/app-icon/hicolor/64x64/apps/ai.storyteller.pdfcraft.png" alt="" width="32" height="32"> | **PdfCraft** | **Reading, organizing and protecting PDFs · you are here** | [GitHub](https://github.com/storytold/pdfcraft) | [Website](https://getartcraft.com/apps/pdfcraft) |
-| <img src="https://raw.githubusercontent.com/storytold/effectcraft/main/assets/app-icon/hicolor/64x64/apps/ai.storyteller.effectcraft.png" alt="" width="32" height="32"> | **EffectCraft** | Motion graphics and visual effects | [GitHub](https://github.com/storytold/effectcraft) | [Website](https://getartcraft.com/apps/effectcraft) |
-| <img src="https://raw.githubusercontent.com/storytold/designcraft/main/assets/app-icon/hicolor/64x64/apps/ai.storyteller.designcraft.png" alt="" width="32" height="32"> | **DesignCraft** | Page layout and publishing | [GitHub](https://github.com/storytold/designcraft) | [Website](https://getartcraft.com/apps/designcraft) |
-
-And [**ArtCraft**](https://getartcraft.com/) itself, our AI image and video studio for artists who want real control.
-
-<br>
-
-<p align="center">
-  <a href="https://discord.gg/artcraft"><img alt="Join the ArtCraft community on Discord" src="https://img.shields.io/badge/Join%20us%20on%20Discord-5865F2?style=for-the-badge&logo=discord&logoColor=white" height="40"></a>
-</p>
-
-<h3 align="center">Come make things with us</h3>
-
-<p align="center">
-  Our Discord is where artists of every kind hang out: people who paint, shoot, draw, cut film,
-  set type, and people still figuring out what they like to make. Share what you're working on,
-  ask for help, tell us what's broken, or tell us what you wish these tools could do.
-  Whatever your medium and however long you've been at it, you're welcome here.
-</p>
-
-<p align="center">
-  <a href="https://discord.gg/artcraft"><b>discord.gg/artcraft</b></a> ·
-  <a href="https://getartcraft.com/">getartcraft.com</a> ·
-  <a href="https://getartcraft.com/apps">The Crafting Apps</a> ·
-  <a href="https://getartcraft.com/apps/pdfcraft">PdfCraft</a>
-</p>
-
 ---
 
 ## License and credits
 
-PdfCraft is dual-licensed under [MIT](LICENSE-MIT) or [Apache-2.0](LICENSE-APACHE), at your option.
+PdfCraft is dual-licensed under [MIT](LICENSE-MIT) or [Apache-2.0](LICENSE-APACHE), at your option, and this
+modified copy keeps both.
 Copyright (c) 2026 ArtCraft Team and the PdfCraft contributors. Required notices are in [NOTICE](NOTICE).
 
 Bundled fonts, icons, images and other assets keep their own open licenses; each one is listed
-with its author, source and license in [ATTRIBUTION.md](ATTRIBUTION.md). Release builds also embed
-the Japanese fonts of [craft-fonts](https://github.com/storytold/craft-fonts/blob/main/ATTRIBUTION.md)
-(SIL Open Font License 1.1).
+with its author, source and license in [ATTRIBUTION.md](ATTRIBUTION.md). PdfCraft's own release builds also
+embed the fonts of [craft-fonts](https://github.com/storytold/craft-fonts/blob/main/ATTRIBUTION.md)
+(SIL Open Font License 1.1); the Compilo PDF website does not.
 
-The ArtCraft name, wordmark and logos in [`docs/brand/`](docs/brand/) are trademarks of the
-ArtCraft Team and are not covered by this license. They may be used only unmodified, and only as
-part of this repository and PdfCraft, under [`docs/brand/LICENSE-brand.txt`](docs/brand/LICENSE-brand.txt).
-Forks and modified versions must remove them.
-
-<p align="center">
-  <a href="https://getartcraft.com/"><img alt="ArtCraft" src="docs/brand/artcraft-mark.svg" width="28"></a><br>
-  <sub>Made by the <a href="https://getartcraft.com/">ArtCraft</a> team and community.</sub>
-</p>
+The ArtCraft name, wordmark and mark are trademarks of the ArtCraft Team and are not covered by this
+license. This repository does not include them and the website does not draw them; the only mention is
+the plain-text credit that this work is based on PdfCraft by the ArtCraft team.
 
 The Tools panel sits on the left, or on the right with Preferences ▸ Tools panel side. The rail stays at the right edge and opens one side panel beside it. Drag a panel's inner edge to resize it; widths are remembered. F4 shows or hides the side panel and Shift+F4 the Tools panel (also in the View menu); View ▸ Reset side panels restores the default arrangement.

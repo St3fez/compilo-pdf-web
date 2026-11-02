@@ -72,13 +72,14 @@ fn about_has_credit_text_and_no_artcraft_image_on_web() {
 }
 
 #[test]
-fn desktop_about_still_shows_the_artcraft_marks() {
+fn desktop_draws_no_artcraft_image_either() {
+    // This fork carries neither the wordmark nor the mark (docs/brand/LICENSE-brand.txt), so the
+    // desktop Home and About leave them out too: the community card and links stay as text.
     let mut h = harness(false);
-    // The Home behind the dialog draws its own mark on the community card.
-    let behind = h.query_all_by_label("ArtCraft").count();
+    assert_eq!(h.query_all_by_label("ArtCraft").count(), 0, "the Home draws no mark");
     h.state_mut().run_command("help.about");
     h.run_steps(4);
-    assert_eq!(h.query_all_by_label("ArtCraft").count() - behind, 2, "the desktop About keeps the mark and the wordmark");
+    assert_eq!(h.query_all_by_label("ArtCraft").count(), 0, "the About dialog draws neither the mark nor the wordmark");
     assert!(h.query_by_label(web_profile::CREDIT).is_none());
 }
 

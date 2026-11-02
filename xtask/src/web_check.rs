@@ -1,4 +1,5 @@
-//! `cargo xtask web-check [dist-dir]`: the built web site loads nothing from another origin and carries no ArtCraft image.
+//! `cargo xtask web-check [dist-dir]`: the built web site loads nothing from another origin, carries no
+//! ArtCraft image and ships its licence documents. `cargo xtask web-licences` puts those beside it.
 //!
 //! The site is a static page on GitHub Pages and has to work offline once loaded, with no CDN, font
 //! host or tracker. `index.html` may not name any absolute URL, and the generated JavaScript may
@@ -13,6 +14,9 @@ use crate::gates;
 /// URL prefixes that appear in generated glue as namespace identifiers (`createElementNS`) and are
 /// never fetched.
 const NAMESPACE_PREFIXES: &[&str] = &["http://www.w3.org/", "https://www.w3.org/"];
+
+/// The notices that sit at the top of the site, next to `index.html`.
+const TOP_NOTICES: &[&str] = &["LICENSE-MIT", "LICENSE-APACHE", "NOTICE"];
 
 /// How many bytes of each brand image [`check_wasm`] looks for.
 const PROBE: usize = 48;
@@ -29,6 +33,12 @@ pub fn run(args: &[String]) -> anyhow::Result<()> {
     let mut problems: Vec<String> = Vec::new();
     if let Err(found) = check_index(&index) {
         problems.extend(found.into_iter().map(|p| format!("index.html: {p}")));
+    }
+    if let Err(found) = check_tree(&gates::root()) {
+        problems.extend(found);
+    }
+    if let Err(found) = check_notices(&dir, &license_documents(&gates::root())?) {
+        problems.extend(found);
     }
     let images = brand_images()?;
     let (mut scripts, mut modules) = (0usize, 0usize);
@@ -47,20 +57,27 @@ pub fn run(args: &[String]) -> anyhow::Result<()> {
         }
     }
     if !problems.is_empty() {
-        bail!("the built site is not self-contained or carries brand images:\n  {}", problems.join("\n  "));
+        bail!("the built site is not self-contained, carries brand images or lacks its licence documents:\n  {}", problems.join("\n  "));
     }
     println!(
-        "web-check: index.html, {scripts} script(s) and {modules} wasm module(s) in {} name no outside address and carry no ArtCraft image",
+        "web-check: index.html, {scripts} script(s) and {modules} wasm module(s) in {} name no outside address and carry no ArtCraft image; the licence documents are beside them",
         dir.display()
     );
     Ok(())
 }
 
-/// The ArtCraft brand SVGs in `docs/brand/`, which the web build must not carry.
+/// The ArtCraft brand SVGs in `docs/brand/`, which the web build must not carry. This fork has none
+/// (see [`check_tree`]); a checkout that still has them is probed for them too.
 fn brand_images() -> anyhow::Result<Vec<(String, Vec<u8>)>> {
-    let dir = gates::root().join("docs/brand");
+    brand_images_in(&gates::root().join("docs/brand"))
+}
+
+fn brand_images_in(dir: &Path) -> anyhow::Result<Vec<(String, Vec<u8>)>> {
     let mut images = Vec::new();
-    for entry in std::fs::read_dir(&dir).with_context(|| format!("listing {}", dir.display()))? {
+    if !dir.is_dir() {
+        return Ok(images);
+    }
+    for entry in std::fs::read_dir(dir).with_context(|| format!("listing {}", dir.display()))? {
         let path = entry?.path();
         if path.extension().is_some_and(|e| e == "svg") {
             let name = path.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
@@ -132,9 +149,192 @@ fn contains(haystack: &[u8], needle: &[u8]) -> bool {
     !needle.is_empty() && haystack.windows(needle.len()).any(|window| window == needle)
 }
 
+/// The ArtCraft marks must not be in the checkout at all (docs/brand/LICENSE-brand.txt: a published
+/// modified version removes them).
+pub(crate) fn check_tree(root: &Path) -> Result<(), Vec<String>> {
+    let Ok(entries) = std::fs::read_dir(root.join("docs/brand")) else { return Ok(()) };
+    let mut found: Vec<String> = entries
+        .flatten()
+        .filter_map(|entry| entry.file_name().into_string().ok())
+        .filter(|name| name.to_ascii_lowercase().starts_with("artcraft"))
+        .map(|name| format!("docs/brand/{name} is an ArtCraft mark, which this fork does not carry"))
+        .collect();
+    found.sort();
+    if found.is_empty() { Ok(()) } else { Err(found) }
+}
+
+/// The licence documents the site must carry beside the wasm: `site` holds the three top-level notices
+/// and every `LICENSES.toml` document under `licenses/`.
+pub(crate) fn check_notices(site: &Path, documents: &[(String, String)]) -> Result<(), Vec<String>> {
+    let wanted = TOP_NOTICES.iter().map(|name| (*name).to_owned()).chain(documents.iter().map(|(_, destination)| format!("licenses/{destination}")));
+    let missing: Vec<String> = wanted
+        .filter(|relative| !std::fs::metadata(site.join(relative)).is_ok_and(|m| m.is_file() && m.len() > 0))
+        .map(|relative| format!("the licence document {relative} is missing or empty (run `cargo xtask web-licences`)"))
+        .collect();
+    if missing.is_empty() { Ok(()) } else { Err(missing) }
+}
+
+/// Copies the licence documents (`(source, destination)` pairs of `LICENSES.toml`) from the checkout
+/// `root` into `site`, as the release zip does with `copy_docs`; returns how many files it wrote.
+pub(crate) fn copy_notices(root: &Path, site: &Path, documents: &[(String, String)]) -> anyhow::Result<usize> {
+    let pairs = TOP_NOTICES
+        .iter()
+        .map(|name| ((*name).to_owned(), (*name).to_owned()))
+        .chain(documents.iter().map(|(source, destination)| (source.clone(), format!("licenses/{destination}"))));
+    let mut copied = 0;
+    for (source, target) in pairs {
+        if target.split(['/', '\\']).any(|part| part == ".." || part.is_empty()) || Path::new(&target).is_absolute() {
+            bail!("unsafe licence document destination {target}");
+        }
+        let to = site.join(&target);
+        if let Some(parent) = to.parent() {
+            std::fs::create_dir_all(parent).with_context(|| format!("creating {}", parent.display()))?;
+        }
+        std::fs::copy(root.join(&source), &to).with_context(|| format!("copying {source} to {}", to.display()))?;
+        copied += 1;
+    }
+    Ok(copied)
+}
+
+/// The `(source, destination)` of every `[[document]]` in `LICENSES.toml`.
+fn license_documents(root: &Path) -> anyhow::Result<Vec<(String, String)>> {
+    let path = root.join("LICENSES.toml");
+    let text = std::fs::read_to_string(&path).with_context(|| format!("reading {}", path.display()))?;
+    let table: toml::Table = toml::from_str(&text).with_context(|| format!("parsing {}", path.display()))?;
+    let documents = table.get("document").and_then(toml::Value::as_array).context("LICENSES.toml has no [[document]] entries")?;
+    documents
+        .iter()
+        .map(|document| {
+            let field = |name: &str| {
+                document
+                    .get(name)
+                    .and_then(toml::Value::as_str)
+                    .map(str::to_owned)
+                    .with_context(|| format!("a LICENSES.toml document has no `{name}`"))
+            };
+            Ok((field("source")?, field("destination")?))
+        })
+        .collect()
+}
+
+/// `cargo xtask web-licences [dist-dir]`: puts the licence documents beside the built site, so a copy
+/// of the wasm (which embeds fonts, icons and other people's code) always travels with its notices.
+pub fn licences(args: &[String]) -> anyhow::Result<()> {
+    let root = gates::root();
+    let site = root.join(args.first().map_or("dist/web", String::as_str));
+    if !site.join("index.html").is_file() {
+        bail!("{} has no index.html: build the site first (trunk build --release in apps/pdfcraft-web)", site.display());
+    }
+    let copied = copy_notices(&root, &site, &license_documents(&root)?)?;
+    println!("web-licences: {copied} licence document(s) copied into {}", site.display());
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::path::PathBuf;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
+    fn scratch() -> PathBuf {
+        static NEXT: AtomicUsize = AtomicUsize::new(0);
+        let dir = std::env::temp_dir().join(format!("pdfcraft-web-check-{}-{}", std::process::id(), NEXT.fetch_add(1, Ordering::Relaxed)));
+        std::fs::create_dir_all(&dir).unwrap();
+        dir
+    }
+
+    fn write(root: &Path, rel: &str, text: &str) {
+        let path = root.join(rel);
+        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+        std::fs::write(path, text).unwrap();
+    }
+
+    /// A checkout with the notices and one font licence, and the `LICENSES.toml` pairs naming them.
+    fn checkout() -> (PathBuf, Vec<(String, String)>) {
+        let root = scratch();
+        let documents = ["LICENSE-MIT", "LICENSE-APACHE", "NOTICE", "assets/fonts/OFL-Inter.txt"];
+        for d in documents {
+            write(&root, d, &format!("text of {d}\n"));
+        }
+        (root, documents.iter().map(|d| ((*d).to_owned(), (*d).to_owned())).collect())
+    }
+
+    #[test]
+    fn a_checkout_with_a_brand_mark_is_rejected() {
+        for file in ["docs/brand/artcraft-mark.svg", "docs/brand/artcraft-logo-white.png"] {
+            let root = scratch();
+            write(&root, file, "<svg/>");
+            let problems = check_tree(&root).unwrap_err();
+            assert!(problems.iter().any(|p| p.contains(file)), "{file}: {problems:?}");
+            std::fs::remove_dir_all(root).unwrap();
+        }
+    }
+
+    #[test]
+    fn a_checkout_without_brand_marks_is_accepted() {
+        let root = scratch();
+        assert!(check_tree(&root).is_ok(), "no docs/brand at all");
+        write(&root, "docs/brand/README.txt", "our own artwork goes here");
+        assert!(check_tree(&root).is_ok(), "other files in docs/brand are not ArtCraft marks");
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn there_are_no_brand_images_to_look_for_when_docs_brand_is_gone() {
+        let root = scratch();
+        assert!(brand_images_in(&root.join("docs/brand")).unwrap().is_empty());
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn a_site_without_the_licence_documents_is_rejected() {
+        let (root, documents) = checkout();
+        let site = scratch();
+        write(&site, "NOTICE", "only this one\n");
+        let problems = check_notices(&site, &documents).unwrap_err();
+        for missing in ["LICENSE-MIT", "LICENSE-APACHE", "licenses/assets/fonts/OFL-Inter.txt"] {
+            assert!(problems.iter().any(|p| p.contains(missing)), "{missing} not reported: {problems:?}");
+        }
+        assert!(!problems.iter().any(|p| p.contains("NOTICE") && !p.contains("licenses/NOTICE")), "the top-level NOTICE is there: {problems:?}");
+        std::fs::remove_dir_all(root).unwrap();
+        std::fs::remove_dir_all(site).unwrap();
+    }
+
+    #[test]
+    fn an_empty_licence_document_does_not_count() {
+        let (root, documents) = checkout();
+        let site = scratch();
+        copy_notices(&root, &site, &documents).unwrap();
+        write(&site, "licenses/assets/fonts/OFL-Inter.txt", "");
+        let problems = check_notices(&site, &documents).unwrap_err();
+        assert!(problems.iter().any(|p| p.contains("OFL-Inter.txt")), "{problems:?}");
+        std::fs::remove_dir_all(root).unwrap();
+        std::fs::remove_dir_all(site).unwrap();
+    }
+
+    #[test]
+    fn copied_notices_satisfy_the_check() {
+        let (root, documents) = checkout();
+        let site = scratch();
+        let copied = copy_notices(&root, &site, &documents).unwrap();
+        assert_eq!(copied, 3 + documents.len(), "the three top-level notices and every document");
+        assert_eq!(std::fs::read_to_string(site.join("licenses/assets/fonts/OFL-Inter.txt")).unwrap(), "text of assets/fonts/OFL-Inter.txt\n");
+        assert_eq!(std::fs::read_to_string(site.join("NOTICE")).unwrap(), "text of NOTICE\n");
+        assert!(check_notices(&site, &documents).is_ok());
+        std::fs::remove_dir_all(root).unwrap();
+        std::fs::remove_dir_all(site).unwrap();
+    }
+
+    #[test]
+    fn copying_a_document_that_is_missing_names_it() {
+        let (root, mut documents) = checkout();
+        documents.push(("assets/fonts/OFL-Gone.txt".to_owned(), "assets/fonts/OFL-Gone.txt".to_owned()));
+        let site = scratch();
+        let error = copy_notices(&root, &site, &documents).unwrap_err();
+        assert!(format!("{error:#}").contains("OFL-Gone.txt"), "{error:#}");
+        std::fs::remove_dir_all(root).unwrap();
+        std::fs::remove_dir_all(site).unwrap();
+    }
 
     fn brand() -> Vec<(String, Vec<u8>)> {
         vec![("artcraft-mark.svg".to_owned(), b"<svg><title>ArtCraft</title><path d=\"M104.28,49.49L81.55,0h-31.23l-3.17,4.76\"/></svg>".to_vec())]

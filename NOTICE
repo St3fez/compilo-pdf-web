@@ -3,9 +3,19 @@ Copyright (c) 2026 ArtCraft Team and the PdfCraft contributors.
 Licensed under the MIT License or the Apache License, Version 2.0, at your option
 (LICENSE-MIT, LICENSE-APACHE).
 
-The ArtCraft name, wordmark and logos in docs/brand/ are trademarks of the ArtCraft Team. They are
-not open source and are not covered by the license above; their terms are in
-docs/brand/LICENSE-brand.txt.
+The ArtCraft name, wordmark and mark are trademarks of the ArtCraft Team. They are not open source
+and are not covered by the license above. This modified version does not include them.
+
+Modifications
+
+This is a modified version of PdfCraft, published as Compilo PDF on the web
+(https://github.com/St3fez/compilo-pdf-web). It was changed by that repository's owner, not by the
+ArtCraft Team or the PdfCraft contributors, who do not endorse it. The changes (a Neon theme, a web
+profile, a web home screen, a Pages deployment, and the removal of the ArtCraft marks) are in its git
+history, which starts from PdfCraft's.
+
+On the Compilo PDF website the documents named below sit in the licenses/ folder next to this file,
+under the paths used here (for example licenses/assets/fonts/OFL-Inter.txt).
 
 Third-party material
 

@@ -50,7 +50,16 @@ const COMMANDS: &[(&str, &str, Command)] = &[
     ("screenshots", "Regenerate the README screenshots in docs/images/ and their ATTRIBUTION entries", screenshots::run),
     ("models", "Fetch the OCR models (ATTRIBUTION.toml kind = \"model\") into assets/models/, verified by SHA-256", assets::models),
     ("demo-pdf", "Build dist/demo/pdfcraft-showcase.pdf (needs Google Chrome or Chromium)", demo_pdf::run),
-    ("web-check", "Check that the built web site (dist/web, or the directory given) names no address outside its own origin", web_check::run),
+    (
+        "web-check",
+        "Check that the built web site (dist/web, or the directory given) names no outside address, carries no ArtCraft image and ships its licence documents",
+        web_check::run,
+    ),
+    (
+        "web-licences",
+        "Copy the LICENSES.toml documents and the top-level notices beside the built web site (dist/web, or the directory given)",
+        web_check::licences,
+    ),
 ];
 
 fn version_cmd(args: &[String]) -> anyhow::Result<()> {
