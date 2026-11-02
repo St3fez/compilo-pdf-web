@@ -49,12 +49,18 @@ pub fn offers_tool(group: &str, command: &str) -> bool {
 /// name them: the permissions password (Protect) and the signatures panel (certificates).
 const ALSO_HIDDEN: &[&str] = &["protect.unlock", "sign.panel"];
 
-/// The commands that some tool group lists and no offered group does, [`ALSO_HIDDEN`] and
-/// [`HIDDEN_HELP`]: what the web build hides. A command no group lists (Open, Save, Print, Undo,
-/// zoom) is never in it.
-fn hidden() -> &'static HashSet<&'static str> {
-    static HIDDEN: OnceLock<HashSet<&'static str>> = OnceLock::new();
-    HIDDEN.get_or_init(|| {
+/// What the catalogue says about the web build, worked out once: the commands it hides and the
+/// commands an offered group lists as one of its tools.
+struct Rules {
+    /// The commands that some tool group lists and no offered group does, [`ALSO_HIDDEN`] and
+    /// [`HIDDEN_HELP`]. A command no group lists (Open, Save, Print, Undo, zoom) is never in it.
+    hidden: HashSet<&'static str>,
+    offered: HashSet<&'static str>,
+}
+
+fn rules() -> &'static Rules {
+    static RULES: OnceLock<Rules> = OnceLock::new();
+    RULES.get_or_init(|| {
         let (mut listed, mut offered) = (HashSet::new(), HashSet::new());
         for g in catalog::TOOL_GROUPS {
             for item in g.sections.iter().flat_map(|s| s.items) {
@@ -69,13 +75,18 @@ fn hidden() -> &'static HashSet<&'static str> {
         let mut hidden: HashSet<&'static str> = listed.difference(&offered).copied().collect();
         hidden.extend(ALSO_HIDDEN);
         hidden.extend(HIDDEN_HELP);
-        hidden
+        Rules { hidden, offered }
     })
 }
 
 /// Whether the web build offers `command`.
 pub fn offers_command(command: &str) -> bool {
-    !hidden().contains(command)
+    !rules().hidden.contains(command)
+}
+
+/// Whether `command` is one of the tools an offered group lists.
+pub fn is_offered_tool(command: &str) -> bool {
+    rules().offered.contains(command)
 }
 
 /// Where the desktop app is published.

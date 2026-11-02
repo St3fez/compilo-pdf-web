@@ -1,6 +1,8 @@
 //! ⌘K command palette: every registered command (with its shortcut) and every tool in the
 //! catalogue, with a fuzzy-ish substring match.
 
+use std::collections::HashSet;
+
 use egui::{Align2, CornerRadius, Rect, Sense, Stroke, vec2};
 use pdfcraft_engine::catalog::{Availability, TOOL_GROUPS};
 
@@ -57,8 +59,11 @@ pub fn show(app: &mut PdfCraftApp, ctx: &egui::Context) {
     let q = pdfcraft_render::text::fold_case(app.palette_query.trim());
     let mut hits: Vec<(usize, Hit)> = Vec::new();
     let active = app.active_ids().map(|(_, id)| id);
+    // The web build searches only what its menus and the tools it offers list: the commands no
+    // menu holds (applying a redaction, the tab order) belong to tools it has left out.
+    let in_menus: Option<HashSet<String>> = app.web_profile.then(|| app.menu_bar(ctx).items().iter().map(|it| it.command.id.clone()).collect());
     for spec in pdfcraft_engine::commands::COMMANDS {
-        if app.hides_command(spec.id) {
+        if app.hides_command(spec.id) || in_menus.as_ref().is_some_and(|m| !m.contains(spec.id) && !crate::web_profile::is_offered_tool(spec.id)) {
             continue;
         }
         let label = pdfcraft_engine::commands::current_label(spec, &app.session, active);

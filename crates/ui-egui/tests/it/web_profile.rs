@@ -294,17 +294,25 @@ fn the_command_search_finds_only_what_the_web_build_offers() {
         let mut h = harness(web);
         h.state_mut().open_bytes("a.pdf", None, pdf()).unwrap();
         h.run_steps(3);
-        for (query, label) in [("redact", "Redact"), ("html", "HTML"), ("combine", "Combine")] {
+        // Commands of the tools the web build left out, by the exact label the palette shows. One of
+        // them (Apply redactions) is in no menu and in no tool group's list, which is how it once got through.
+        for (query, label) in [
+            ("redaction", "Apply redactions…"),
+            ("html", "Export to HTML…"),
+            ("combine", "Combine files…"),
+            ("multiple files", "Recognize text in multiple files…"),
+        ] {
             h.state_mut().palette_open = true;
             h.state_mut().palette_query = query.to_owned();
             h.run_steps(4);
-            assert_eq!(h.query_all_by_label_contains(label).count() > 0, found, "search {query}; web profile: {web}");
+            assert_eq!(shown(&h, label), found, "search {query}; web profile: {web}");
         }
-        for (query, label) in [("word", "Word"), ("sign", "Sign"), ("print", "Print"), ("ocr", "OCR")] {
+        for (query, label) in [("word", "Export to Word…"), ("fill", "Fill & Sign: add text"), ("print", "Print…"), ("recognize", "Recognize text…")]
+        {
             h.state_mut().palette_open = true;
             h.state_mut().palette_query = query.to_owned();
             h.run_steps(4);
-            assert!(h.query_all_by_label_contains(label).count() > 0, "search {query} finds nothing; web profile: {web}");
+            assert!(shown(&h, label), "search {query} does not find {label}; web profile: {web}");
         }
     }
 }
