@@ -54,6 +54,8 @@ pub(super) fn edit_panel(app: &mut PdfCraftApp, ui: &mut egui::Ui, t: &Tokens, g
     }
     // Format text at the top while text is selected or being added.
     format_section(app, ui, t);
+    // The web build links none of the tools it leaves out.
+    let others: Vec<&ToolGroup> = EDIT_OTHER_TOOLS.iter().filter(|id| !app.hides_group(id)).filter_map(|id| catalog::group(id)).collect();
     egui::ScrollArea::vertical().auto_shrink([false, false]).show(ui, |ui| {
         widgets::section_title(ui, tl!("Modify page"));
         ui.horizontal(|ui| {
@@ -112,8 +114,10 @@ pub(super) fn edit_panel(app: &mut PdfCraftApp, ui: &mut egui::Ui, t: &Tokens, g
             }
         }
 
-        widgets::section_title(ui, tl!("Other options"));
-        for other in EDIT_OTHER_TOOLS.iter().filter_map(|id| catalog::group(id)) {
+        if !others.is_empty() {
+            widgets::section_title(ui, tl!("Other options"));
+        }
+        for other in &others {
             if edit_row(ui, t, other.icon, tl!(other.label), other.availability).clicked() {
                 tool = Some(other.id);
             }

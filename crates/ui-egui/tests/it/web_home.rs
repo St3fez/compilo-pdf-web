@@ -1,4 +1,4 @@
-//! The web Home: a drop zone above eight tool tiles, whatever a visitor drops or picks.
+//! The web Home: a drop zone above four tool tiles, whatever a visitor drops or picks.
 
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -9,7 +9,9 @@ use pdfcraft_ui_egui::{LeftPanel, PdfCraftApp};
 
 const DROP_ZONE: &str = "Drop a PDF here or click to open";
 /// The tiles' labels, in the order the Home shows them.
-const TILES: [&str; 8] = ["Edit", "Organize", "Comment", "Sign", "Forms", "Redact", "OCR", "Convert"];
+const TILES: [&str; 4] = ["Fill & Sign", "Edit", "Convert", "OCR"];
+/// The tools the web build left out: they have no tile.
+const DROPPED: [&str; 4] = ["Organize", "Comment", "Forms", "Redact"];
 
 /// A file dropped on the window, as the windowing layer hands it over.
 #[derive(Debug)]
@@ -64,7 +66,7 @@ fn zone_bottom(h: &Harness<'static, PdfCraftApp>) -> f32 {
 }
 
 #[test]
-fn web_home_shows_the_drop_zone_above_eight_tiles_in_order() {
+fn web_home_shows_the_drop_zone_above_four_tiles_in_order() {
     let h = harness(desktop_size());
     let below = zone_bottom(&h);
     let rects: Vec<egui::Rect> = TILES.iter().map(|label| tile(&h, label, below).rect()).collect();
@@ -77,10 +79,23 @@ fn web_home_shows_the_drop_zone_above_eight_tiles_in_order() {
 }
 
 #[test]
+fn web_home_has_no_tile_for_the_tools_it_left_out() {
+    let h = harness(desktop_size());
+    let below = zone_bottom(&h);
+    for label in DROPPED {
+        let wanted = label.to_owned();
+        let found = h
+            .query_all_by(move |n| n.role() == egui::accesskit::Role::Button && n.label().as_deref() == Some(wanted.as_str()))
+            .any(|n| n.rect().top() >= below);
+        assert!(!found, "the web Home still has a {label} tile");
+    }
+}
+
+#[test]
 fn picking_a_tool_before_a_file_starts_it_once_the_file_opens() {
     let mut h = harness(desktop_size());
     let below = zone_bottom(&h);
-    tile(&h, "Sign", below).click();
+    tile(&h, "Fill & Sign", below).click();
     h.run_steps(3);
     assert!(h.state().active.is_none(), "no document is open yet");
     h.state_mut().open_bytes("a.pdf", None, pdf("a")).unwrap();
@@ -124,13 +139,13 @@ fn dropping_three_pdfs_opens_three_tabs() {
 fn a_failed_open_clears_the_picked_tool() {
     let mut h = harness(desktop_size());
     let below = zone_bottom(&h);
-    tile(&h, "Redact", below).click();
+    tile(&h, "Edit", below).click();
     h.run_steps(3);
-    assert_eq!(h.state().left, LeftPanel::Tool("redact"), "the tile picked the tool");
+    assert_eq!(h.state().left, LeftPanel::Tool("edit"), "the tile picked the tool");
     drop_file(&mut h, "broken.pdf", b"hello".to_vec());
     crate::support::wait_until(&mut h, "an error notification", |app| app.toast.is_some());
     h.run_steps(3);
-    assert_ne!(h.state().left, LeftPanel::Tool("redact"), "a later file must not start Redact");
+    assert_ne!(h.state().left, LeftPanel::Tool("edit"), "a later file must not start Edit");
 }
 
 #[test]

@@ -11,8 +11,11 @@ The first visit downloads about 17.5 MB, almost all of it the WebAssembly (47 MB
 Pages serves it compressed); the scripts are 26 KB. With the files cached the editor starts in about one
 second.
 
-OCR, crash recovery and signing with a PKCS #12 certificate need the desktop app; the web build marks them
-"Desktop app only".
+The web build is deliberately small. It fills in and signs a PDF, edits it, converts it to Word, prints it
+and has an OCR tool; everything else PdfCraft does (combine, organize, comment, redact, protect, forms
+authoring and the rest) stays in the desktop app and is left out of the web menus, tool lists and search.
+Word is export only: there is no Word to PDF. OCR does not run in the browser yet, so the web build marks
+it "Desktop app only", as it does signing with a PKCS #12 certificate.
 
 Compilo PDF is based on PdfCraft by the ArtCraft team. The code is MIT OR Apache-2.0: see
 [LICENSE-MIT](LICENSE-MIT), [LICENSE-APACHE](LICENSE-APACHE) and [NOTICE](NOTICE). The site carries them

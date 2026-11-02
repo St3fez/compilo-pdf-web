@@ -1,4 +1,4 @@
-//! The Home of the web profile: a drop zone above eight tool tiles, then the Recent list. Opening a
+//! The Home of the web profile: a drop zone above four tool tiles, then the Recent list. Opening a
 //! file by dropping it is the app's own handler; this page only shows where to drop and what to do.
 
 use egui::{Align2, CornerRadius, Rect, Sense, Shape, Stroke, pos2, vec2};
@@ -10,16 +10,7 @@ use crate::theme::{self, Tokens, neon};
 use crate::{LeftPanel, PdfCraftApp};
 
 /// `(catalogue group id, label)` of each tile, in the order they are shown.
-pub const WEB_TILES: [(&str, &str); 8] = [
-    ("edit", "Edit"),
-    ("organize", "Organize"),
-    ("comment", "Comment"),
-    ("fill_sign", "Sign"),
-    ("form", "Forms"),
-    ("redact", "Redact"),
-    ("scan", "OCR"),
-    ("export", "Convert"),
-];
+pub const WEB_TILES: [(&str, &str); 4] = [("fill_sign", "Fill & Sign"), ("edit", "Edit"), ("export", "Convert"), ("scan", "OCR")];
 
 /// The space between tiles, in points.
 const GAP: f32 = 14.0;

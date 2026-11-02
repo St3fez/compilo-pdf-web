@@ -58,6 +58,9 @@ pub fn show(app: &mut PdfCraftApp, ctx: &egui::Context) {
     let mut hits: Vec<(usize, Hit)> = Vec::new();
     let active = app.active_ids().map(|(_, id)| id);
     for spec in pdfcraft_engine::commands::COMMANDS {
+        if app.hides_command(spec.id) {
+            continue;
+        }
         let label = pdfcraft_engine::commands::current_label(spec, &app.session, active);
         let translated = crate::i18n::command_label(&label);
         if let Some(s) = score(&translated, &q).or_else(|| score(&label, &q)).or_else(|| score(spec.id, &q).map(|s| s + 50)) {
@@ -78,6 +81,9 @@ pub fn show(app: &mut PdfCraftApp, ctx: &egui::Context) {
         }
     }
     for g in TOOL_GROUPS {
+        if app.hides_group(g.id) {
+            continue;
+        }
         if let Some(s) = score(tl!(g.label), &q).or_else(|| score(g.label, &q)) {
             hits.push((
                 s,
@@ -93,8 +99,8 @@ pub fn show(app: &mut PdfCraftApp, ctx: &egui::Context) {
         }
         for sec in g.sections {
             for i in sec.items {
-                if pdfcraft_engine::commands::command(i.command).is_some() {
-                    continue; // listed above as a command
+                if pdfcraft_engine::commands::command(i.command).is_some() || app.hides_tool(g.id, i.command) {
+                    continue; // listed above as a command, or left out of this build
                 }
                 if let Some(s) = score(tl!(i.label), &q).or_else(|| score(i.label, &q)).or_else(|| score(i.command, &q).map(|s| s + 50)) {
                     hits.push((

@@ -76,22 +76,25 @@ fn all_tools(app: &mut PdfCraftApp, ui: &mut egui::Ui, t: &Tokens) {
         // The scrollbar floats over the right edge: keep the rows (and their rounded hover wash) clear of it.
         ui.set_max_width((ui.available_width() - SCROLLBAR_GUTTER).max(0.0));
         ui.add_space(2.0);
-        let shown = if app.all_tools_expanded { TOOL_GROUPS.len() } else { COLLAPSED_TOOLS.min(TOOL_GROUPS.len()) };
-        for g in &TOOL_GROUPS[..shown] {
+        // The web build lists only the groups it offers.
+        let groups: Vec<&ToolGroup> = TOOL_GROUPS.iter().filter(|g| !app.hides_group(g.id)).collect();
+        let shown = if app.all_tools_expanded { groups.len() } else { COLLAPSED_TOOLS.min(groups.len()) };
+        for g in &groups[..shown] {
             if tool_row(ui, t, g).clicked() {
                 app.select_tool(g.id);
             }
         }
         ui.add_space(4.0);
         let more = if app.all_tools_expanded { "View less" } else { "View more" };
-        if ui
-            .add(
-                egui::Label::new(egui::RichText::new(tl!(more)).color(t.accent_text).font(theme::medium(13.0)))
-                    .selectable(false)
-                    .sense(Sense::click()),
-            )
-            .on_hover_cursor(egui::CursorIcon::PointingHand)
-            .clicked()
+        if groups.len() > COLLAPSED_TOOLS
+            && ui
+                .add(
+                    egui::Label::new(egui::RichText::new(tl!(more)).color(t.accent_text).font(theme::medium(13.0)))
+                        .selectable(false)
+                        .sense(Sense::click()),
+                )
+                .on_hover_cursor(egui::CursorIcon::PointingHand)
+                .clicked()
         {
             app.all_tools_expanded = !app.all_tools_expanded;
         }
@@ -217,9 +220,15 @@ fn tool_detail(app: &mut PdfCraftApp, ui: &mut egui::Ui, t: &Tokens, g: &'static
     egui::ScrollArea::vertical().auto_shrink([false, false]).max_height(list_h).show(ui, |ui| {
         ui.add_space(2.0);
         for s in g.sections {
+            if s.items.iter().all(|i| app.hides_tool(g.id, i.command)) {
+                continue;
+            }
             widgets::section_title(ui, tl!(s.title));
             for item in s.items {
                 if g.id == "fill_sign" && (item.command.starts_with("sign.fill.signature") || item.command.starts_with("sign.fill.initials")) {
+                    continue;
+                }
+                if app.hides_tool(g.id, item.command) {
                     continue;
                 }
                 let (rect, resp) = ui.allocate_exact_size(vec2(ui.available_width(), 34.0), Sense::click());

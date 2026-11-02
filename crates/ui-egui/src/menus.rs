@@ -280,8 +280,9 @@ impl PdfCraftApp {
         let mut used: Vec<&str> = Vec::new();
         let list = |ids: &[&'static str], used: &mut Vec<&'static str>| -> Vec<Node> {
             ids.iter()
-                // The web profile drops the links to ArtCraft's community and site.
-                .filter(|id| !(self.web_profile && crate::web_profile::HIDDEN_HELP.contains(id)))
+                // The web profile drops the Help links and the tools it leaves out; a submenu left
+                // empty is dropped by `tidy`.
+                .filter(|id| !self.hides_command(id))
                 .map(|&id| {
                     if id == SEP {
                         return Node::Separator;
@@ -293,20 +294,15 @@ impl PdfCraftApp {
         };
         let file = {
             let mut nodes = Vec::new();
-            for node in list(FILE, &mut used) {
-                // Open Recent is the live recent list; Create, Export and Protect follow Combine,
-                // Optimize and Close.
-                let recent = matches!(&node, Node::Item(it) if it.command.id == "file.open_recent");
-                if recent {
-                    nodes.push(self.recent_menu());
-                    continue;
+            for &id in FILE {
+                for node in list(&[id], &mut used) {
+                    // Open Recent is the live recent list.
+                    let recent = matches!(&node, Node::Item(it) if it.command.id == "file.open_recent");
+                    nodes.push(if recent { self.recent_menu() } else { node });
                 }
-                let after = match &node {
-                    Node::Item(it) => it.command.id.clone(),
-                    _ => String::new(),
-                };
-                nodes.push(node);
-                match after.as_str() {
+                // Create, Export and Protect follow Combine and Optimize, even where the web build
+                // leaves those two out.
+                match id {
                     "page.combine" => nodes.push(Node::submenu(tl!("Create"), list(CREATE, &mut used))),
                     "optimize.advanced" => {
                         nodes.push(Node::submenu(tl!("Export"), list(EXPORT, &mut used)));
@@ -427,13 +423,13 @@ impl PdfCraftApp {
     fn tools_menu(&self, used: &[&str]) -> Vec<Node> {
         TOOL_GROUPS
             .iter()
-            .filter(|g| g.availability == Availability::Ready)
+            .filter(|g| g.availability == Availability::Ready && !self.hides_group(g.id))
             .map(|group| {
                 let mut nodes = Vec::new();
                 let mut seen: Vec<&str> = Vec::new();
                 for section in group.sections {
                     nodes.push(Node::Separator);
-                    for tool in section.items.iter().filter(|t| t.availability == Availability::Ready) {
+                    for tool in section.items.iter().filter(|t| t.availability == Availability::Ready && !self.hides_tool(group.id, t.command)) {
                         let actions: &[&'static str] = if tool.actions.is_empty() { std::slice::from_ref(&tool.command) } else { tool.actions };
                         for &id in actions {
                             if commands::command(id).is_none() || used.contains(&id) || seen.contains(&id) {

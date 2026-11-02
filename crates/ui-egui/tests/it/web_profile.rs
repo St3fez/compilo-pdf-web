@@ -53,6 +53,26 @@ fn home_has_no_artcraft_mark_or_community_card_on_web() {
 }
 
 #[test]
+fn the_web_help_menu_has_no_updater_and_no_link_to_the_upstream_repository() {
+    let mut h = harness(true);
+    crate::support::open_menu(&mut h, "Help");
+    for label in ["Check for updates…", "Compilo PDF on GitHub"] {
+        assert!(!menu_row_exists(&h, label), "{label} is still in the Help menu: the web build updates itself and is not hosted there");
+    }
+}
+
+/// A test of its own: turning the web profile on renames the product for the whole thread, so the
+/// desktop's "PdfCraft on GitHub" is only itself in a thread that never did.
+#[test]
+fn the_desktop_help_menu_keeps_the_updater_and_the_github_link() {
+    let mut h = harness(false);
+    crate::support::open_menu(&mut h, "Help");
+    for label in ["Check for updates…", "PdfCraft on GitHub"] {
+        assert!(menu_row_exists(&h, label), "{label} must stay on the desktop");
+    }
+}
+
+#[test]
 fn desktop_help_menu_keeps_the_community_links() {
     let mut h = harness(false);
     crate::support::open_menu(&mut h, "Help");
@@ -148,14 +168,144 @@ fn desktop_only_commands_are_refused_with_a_hint_on_web() {
 }
 
 #[test]
-fn desktop_only_menu_entries_are_disabled_on_web_and_enabled_on_the_desktop() {
-    for (web, disabled) in [(true, true), (false, false)] {
+fn signing_with_a_certificate_is_not_listed_on_web_and_is_enabled_on_the_desktop() {
+    for web in [true, false] {
         let mut h = harness(web);
         h.state_mut().open_bytes("a.pdf", None, pdf()).unwrap();
         h.run_steps(3);
         crate::support::open_menu(&mut h, "Sign");
-        let row = crate::support::menu_row(&h, "Digitally sign");
-        assert_eq!(row.accesskit_node().is_disabled(), disabled, "web profile: {web}");
+        if web {
+            assert!(!menu_row_exists(&h, "Digitally sign"), "the web Sign menu lists a certificate signature it cannot make");
+            crate::support::menu_row(&h, "Fill & Sign");
+        } else {
+            assert!(!crate::support::menu_row(&h, "Digitally sign").accesskit_node().is_disabled());
+        }
+    }
+}
+
+/// The tool groups the web build offers, and ones it leaves out: by the labels the lists show.
+const OFFERED: [&str; 4] = ["Fill & Sign", "Edit a PDF", "Export a PDF", "Scan & OCR"];
+const LEFT_OUT: [&str; 6] = ["Combine files", "Organize pages", "Add comments", "Protect a PDF", "Redact a PDF", "Prepare a form"];
+
+/// Whether anything on screen carries `label`: a name may sit on more than one widget (the mode
+/// bar has a Fill & Sign button too), so this counts instead of asking for exactly one.
+fn shown(h: &Harness<'static, PdfCraftApp>, label: &str) -> bool {
+    h.query_all_by_label(label).count() > 0
+}
+
+fn shown_containing(h: &Harness<'static, PdfCraftApp>, label: &str) -> bool {
+    h.query_all_by_label_contains(label).count() > 0
+}
+
+fn with_tool_pane(web: bool, pane: pdfcraft_ui_egui::LeftPanel) -> Harness<'static, PdfCraftApp> {
+    let mut h = harness(web);
+    h.state_mut().open_bytes("a.pdf", None, pdf()).unwrap();
+    h.state_mut().left = pane;
+    h.state_mut().left_open = true;
+    h.run_steps(4);
+    h
+}
+
+#[test]
+fn the_all_tools_list_holds_only_the_four_jobs_on_web() {
+    let h = with_tool_pane(true, pdfcraft_ui_egui::LeftPanel::AllTools);
+    for label in OFFERED {
+        assert!(shown(&h, label), "the web tool list lacks {label}");
+    }
+    for label in LEFT_OUT {
+        assert!(!shown(&h, label), "the web tool list still shows {label}");
+    }
+    assert!(!shown(&h, "View more"), "four tools need no View more");
+}
+
+#[test]
+fn the_desktop_all_tools_list_is_unchanged() {
+    let h = with_tool_pane(false, pdfcraft_ui_egui::LeftPanel::AllTools);
+    for label in OFFERED.into_iter().chain(LEFT_OUT) {
+        assert!(shown(&h, label), "the desktop tool list lacks {label}");
+    }
+    assert!(shown(&h, "View more"));
+}
+
+#[test]
+fn the_expanded_tool_view_holds_only_the_four_jobs_on_web() {
+    let mut h = with_tool_pane(true, pdfcraft_ui_egui::LeftPanel::AllTools);
+    h.get_by_label("Expand all tools").click();
+    h.run_steps(4);
+    assert!(h.state().all_tools_full, "the expanded view is showing");
+    for label in OFFERED {
+        assert!(shown_containing(&h, label), "the expanded web view lacks {label}");
+    }
+    for label in LEFT_OUT {
+        assert!(!shown_containing(&h, label), "the expanded web view still shows {label}");
+    }
+}
+
+#[test]
+fn the_export_panel_offers_only_word_on_web() {
+    for (web, others) in [(true, false), (false, true)] {
+        let h = with_tool_pane(web, pdfcraft_ui_egui::LeftPanel::Tool("export"));
+        assert!(shown(&h, "Microsoft Word (.docx)"), "web profile: {web}");
+        assert_eq!(shown(&h, "HTML web page"), others, "web profile: {web}");
+        assert_eq!(shown(&h, "Text (plain)"), others, "web profile: {web}");
+    }
+}
+
+#[test]
+fn the_ocr_panel_offers_only_this_file_on_web() {
+    for (web, batch) in [(true, false), (false, true)] {
+        let h = with_tool_pane(web, pdfcraft_ui_egui::LeftPanel::Tool("scan"));
+        assert!(shown(&h, "In this file"), "web profile: {web}");
+        assert_eq!(shown(&h, "In multiple files"), batch, "web profile: {web}");
+        assert_eq!(shown(&h, "Enhance camera image"), batch, "web profile: {web}");
+    }
+}
+
+#[test]
+fn the_edit_panel_links_no_other_tool_on_web() {
+    for (web, linked) in [(true, false), (false, true)] {
+        let h = with_tool_pane(web, pdfcraft_ui_egui::LeftPanel::Tool("edit"));
+        for label in ["Combine files", "Redact a PDF", "Prepare a form"] {
+            assert_eq!(shown(&h, label), linked, "{label}; web profile: {web}");
+        }
+    }
+}
+
+#[test]
+fn the_file_menu_keeps_open_save_and_print_and_drops_the_other_tools_on_web() {
+    for web in [true, false] {
+        let mut h = harness(web);
+        h.state_mut().open_bytes("a.pdf", None, pdf()).unwrap();
+        h.run_steps(3);
+        crate::support::open_menu(&mut h, "File");
+        for label in ["Open…", "Save", "Print…"] {
+            crate::support::menu_row(&h, label);
+        }
+        for label in ["Combine files…", "Create", "Protect"] {
+            assert_eq!(menu_row_exists(&h, label), !web, "{label}; web profile: {web}");
+        }
+        crate::support::menu_row(&h, "Export");
+    }
+}
+
+#[test]
+fn the_command_search_finds_only_what_the_web_build_offers() {
+    for (web, found) in [(true, false), (false, true)] {
+        let mut h = harness(web);
+        h.state_mut().open_bytes("a.pdf", None, pdf()).unwrap();
+        h.run_steps(3);
+        for (query, label) in [("redact", "Redact"), ("html", "HTML"), ("combine", "Combine")] {
+            h.state_mut().palette_open = true;
+            h.state_mut().palette_query = query.to_owned();
+            h.run_steps(4);
+            assert_eq!(h.query_all_by_label_contains(label).count() > 0, found, "search {query}; web profile: {web}");
+        }
+        for (query, label) in [("word", "Word"), ("sign", "Sign"), ("print", "Print"), ("ocr", "OCR")] {
+            h.state_mut().palette_open = true;
+            h.state_mut().palette_query = query.to_owned();
+            h.run_steps(4);
+            assert!(h.query_all_by_label_contains(label).count() > 0, "search {query} finds nothing; web profile: {web}");
+        }
     }
 }
 
