@@ -1,6 +1,7 @@
 //! `cargo xtask web-check [dist-dir]`: the built web site loads nothing from another origin, carries no
-//! ArtCraft image and ships its licence documents and its OCR models. `cargo xtask web-licences` puts
-//! the documents beside it, `cargo xtask models dist/web/models` the models.
+//! ArtCraft image and ships its licence documents, its OCR models and its Search Console file.
+//! `cargo xtask web-licences` puts the documents beside it, `cargo xtask models dist/web/models` the
+//! models.
 //!
 //! The site is a static page on GitHub Pages and has to work offline once loaded, with no CDN, font
 //! host or tracker. `index.html` may not name any absolute URL, and the generated JavaScript may
@@ -51,6 +52,9 @@ pub fn run(args: &[String]) -> anyhow::Result<()> {
     if let Err(found) = check_models(&dir, &models) {
         problems.extend(found);
     }
+    if let Err(found) = check_search_console(&dir) {
+        problems.extend(found);
+    }
     let images = brand_images()?;
     let (mut scripts, mut modules) = (0usize, 0usize);
     for entry in std::fs::read_dir(&dir).with_context(|| format!("listing {}", dir.display()))? {
@@ -69,7 +73,7 @@ pub fn run(args: &[String]) -> anyhow::Result<()> {
     }
     if !problems.is_empty() {
         bail!(
-            "the built site is not self-contained, carries brand images or lacks its licence documents or OCR models:\n  {}",
+            "the built site is not self-contained, carries brand images or lacks its licence documents, OCR models or Search Console file:\n  {}",
             problems.join("\n  ")
         );
     }
@@ -241,6 +245,20 @@ pub(crate) fn check_models(site: &Path, models: &[(String, String)]) -> Result<(
         problems.push("the credits models/ATTRIBUTION.txt are missing or empty".to_owned());
     }
     if problems.is_empty() { Ok(()) } else { Err(problems) }
+}
+
+/// The file Google Search Console fetches to confirm the site is the owner's
+/// (https://st3fez.github.io/compilo-pdf-web/ is a URL-prefix property verified by HTML file).
+/// `index.html` copies it into the site; deleting it later unverifies the property.
+const SEARCH_CONSOLE_FILE: &str = "google07d7cf89ae939f6f.html";
+
+/// `site` serves [`SEARCH_CONSOLE_FILE`] with the one line Google wrote in it.
+pub(crate) fn check_search_console(site: &Path) -> Result<(), Vec<String>> {
+    match std::fs::read_to_string(site.join(SEARCH_CONSOLE_FILE)) {
+        Ok(text) if text.trim_end() == format!("google-site-verification: {SEARCH_CONSOLE_FILE}") => Ok(()),
+        Ok(_) => Err(vec![format!("{SEARCH_CONSOLE_FILE} does not hold the line Google Search Console wrote in it")]),
+        Err(_) => Err(vec![format!("{SEARCH_CONSOLE_FILE}, which Google Search Console fetches to verify the site, is missing")]),
+    }
 }
 
 /// Copies the licence documents (`(source, destination)` pairs of `LICENSES.toml`) from the checkout
@@ -465,6 +483,27 @@ mod tests {
         {
             assert!(check_index(&format!(r#"<a href="{look_alike}">"#)).is_err(), "{look_alike} is not the site");
         }
+    }
+
+    /// Google Search Console confirms the site is the owner's by fetching this file: the site must
+    /// carry it, as Google wrote it, or the property loses its verification.
+    #[test]
+    fn a_site_without_its_search_console_file_is_rejected() {
+        let site = scratch();
+        assert!(check_search_console(&site).is_err(), "no file");
+        write(&site, SEARCH_CONSOLE_FILE, "google-site-verification: google0123456789abcdef.html");
+        assert!(check_search_console(&site).is_err(), "another property's text");
+        write(&site, SEARCH_CONSOLE_FILE, &format!("google-site-verification: {SEARCH_CONSOLE_FILE}"));
+        assert!(check_search_console(&site).is_ok(), "{:?}", check_search_console(&site));
+        std::fs::remove_dir_all(site).unwrap();
+    }
+
+    #[test]
+    fn the_web_app_copies_its_search_console_file_into_the_site() {
+        let app = gates::root().join("apps/pdfcraft-web");
+        assert!(check_search_console(&app).is_ok(), "{:?}", check_search_console(&app));
+        let index = std::fs::read_to_string(app.join("index.html")).unwrap();
+        assert!(index.contains(&format!(r#"<link data-trunk rel="copy-file" href="{SEARCH_CONSOLE_FILE}" />"#)), "index.html does not copy it");
     }
 
     /// A file `index.html` names by the site's own address (the preview image) must be on the site.
