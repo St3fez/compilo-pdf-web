@@ -105,11 +105,11 @@ pub const DOWNLOAD_LABEL: &str = "Get the PdfCraft desktop app";
 /// taking the screen instead of squeezing the page, and closed once a tool is picked in it.
 pub const PHONE_WIDTH: f32 = 600.0;
 
-/// The store page of the Compilo PDF app for Android, which the web Home suggests on Android.
+/// The store page of the Compilo PDF app for Android, which the web Home links to.
 pub const PLAY_STORE_URL: &str = "https://play.google.com/store/apps/details?id=com.pdfcraft.pdfcraft_mobile";
 
 /// The link to [`PLAY_STORE_URL`].
-pub const PLAY_STORE_LABEL: &str = "On Android? Get the Compilo PDF app on Google Play";
+pub const PLAY_STORE_LABEL: &str = "Get the Compilo PDF app for Android on Google Play";
 
 /// What the app calls itself: [`NAME`] on the web profile, "PdfCraft" otherwise.
 pub(crate) fn product_name(web_profile: bool) -> &'static str {
@@ -167,10 +167,6 @@ impl PdfCraftApp {
     /// the Neon default.
     pub fn set_web_profile(&mut self) {
         self.web_profile = true;
-        #[cfg(target_arch = "wasm32")]
-        {
-            self.android = web_sys::window().and_then(|w| w.navigator().user_agent().ok()).is_some_and(|agent| agent.contains("Android"));
-        }
         crate::i18n::set_product_name(NAME);
         if self.theme_preference == ThemePreference::System {
             self.set_theme_preference(ThemePreference::Neon);
