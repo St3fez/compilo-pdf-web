@@ -25,6 +25,12 @@ craft-print = { git = "https://github.com/storytold/craft-libs", version = "0.1.
 craft-docpath = { version = "0.1.0", git = "https://github.com/storytold/craft-libs", rev = "c5a1cbfb5f9049f9270955caffb5bee5997aebf7" }
 # craft-update: app-specific pretend versions apply to startup and manual checks.
 craft-update = { git = "https://github.com/storytold/craft-libs", version = "=0.1.0", rev = "c5a1cbfb5f9049f9270955caffb5bee5997aebf7", features = ["egui"] }
+# Word files open in the web build: WordCraft reads .docx and .doc and writes the PDF, in pure Rust with its own
+# bundled OFL fonts (pdfcraft-create `word`). Pinned to an immutable revision; no other WordCraft crate is used.
+wordcraft-docx = { git = "https://github.com/storytold/wordcraft", version = "=0.18.1", rev = "c179a31619632d96728653f00c56246ba374e928" }
+wordcraft-docbin = { git = "https://github.com/storytold/wordcraft", version = "=0.18.1", rev = "c179a31619632d96728653f00c56246ba374e928" }
+wordcraft-pdf = { git = "https://github.com/storytold/wordcraft", version = "=0.18.1", rev = "c179a31619632d96728653f00c56246ba374e928" }
+wordcraft-fonts = { git = "https://github.com/storytold/wordcraft", version = "=0.18.1", rev = "c179a31619632d96728653f00c56246ba374e928" }
 # internal
 pdfcraft-geom = { path = "crates/geom", version = "0.16.1" }
 pdfcraft-filters = { path = "crates/filters", version = "0.16.1" }
@@ -133,6 +139,9 @@ hayro-cmap = { path = "vendor/hayro-cmap" }
 hayro-postscript = { path = "vendor/hayro-postscript" }
 hayro-jbig2 = { path = "vendor/hayro-jbig2" }
 lopdf = { path = "vendor/lopdf" }
+# craft-pdf (behind wordcraft-pdf) needs this one from craft-libs at the revision WordCraft pins: its writer
+# rejects writers that failed during unwinding. Cargo does not carry a dependency's own patches over.
+krilla = { git = "https://github.com/storytold/craft-libs", rev = "b436ae992591173ce53fdb1314421ba2d8897e49" }
 vello_common = { path = "vendor/vello_common" }
 vello_cpu = { path = "vendor/vello_cpu" }
 # The egui and winit crates below are pinned to immutable storytold git revisions (egui

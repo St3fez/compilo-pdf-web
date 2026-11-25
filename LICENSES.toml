@@ -35,11 +35,13 @@ sha256 = "6f090277c00af96651ce6dbcc38ff1591047a3bffef486e80b6a32e8276a8201"
 
 [[document]]
 source = "assets/fonts/OFL-Inter.txt"
+licences = ["OFL-1.1"]
 destination = "assets/fonts/OFL-Inter.txt"
 sha256 = "262481e844521b326f5ecd053e59b98c8b2da78c8ee1bdbb6e8174305e54935a"
 
 [[document]]
 source = "assets/fonts/OFL-JetBrainsMono.txt"
+licences = ["OFL-1.1"]
 destination = "assets/fonts/OFL-JetBrainsMono.txt"
 sha256 = "a76abf002c49097d146e86740a3105a5d00450b1592e820a1109a8c5680cd697"
 
@@ -152,3 +154,95 @@ crate = "hayro-interpret"
 path = "src/font/generated/metrics.rs"
 licence = "MIT OR Apache-2.0"
 documents = ["vendor/hayro-interpret/LICENSE-MIT", "vendor/hayro-interpret/LICENSE-APACHE"]
+
+[[document]]
+source = "licenses/wordcraft-OFL-SourceSans3.txt"
+licences = ["OFL-1.1"]
+destination = "licenses/wordcraft-OFL-SourceSans3.txt"
+sha256 = "5d8778c6a43dc2fee25e81ee6ff07e52c6f238473b491cda47f7117a2ce9d467"
+origin = "https://raw.githubusercontent.com/storytold/wordcraft/c179a31619632d96728653f00c56246ba374e928/assets/fonts/OFL-SourceSans3.txt"
+
+[[document]]
+source = "licenses/wordcraft-OFL-SourceSerif4.txt"
+licences = ["OFL-1.1"]
+destination = "licenses/wordcraft-OFL-SourceSerif4.txt"
+sha256 = "717a22f1bd2e30d49c21a2a6f548819aacd0ade1adf854533f4d42a01bb4f910"
+origin = "https://raw.githubusercontent.com/storytold/wordcraft/c179a31619632d96728653f00c56246ba374e928/assets/fonts/OFL-SourceSerif4.txt"
+
+[[bundled]]
+crate = "wordcraft-fonts"
+path = "assets/fonts/Inter-Regular.ttf"
+licence = "OFL-1.1"
+documents = ["assets/fonts/OFL-Inter.txt"]
+
+[[bundled]]
+crate = "wordcraft-fonts"
+path = "assets/fonts/Inter-Medium.ttf"
+licence = "OFL-1.1"
+documents = ["assets/fonts/OFL-Inter.txt"]
+
+[[bundled]]
+crate = "wordcraft-fonts"
+path = "assets/fonts/Inter-SemiBold.ttf"
+licence = "OFL-1.1"
+documents = ["assets/fonts/OFL-Inter.txt"]
+
+[[bundled]]
+crate = "wordcraft-fonts"
+path = "assets/fonts/JetBrainsMono-Regular.ttf"
+licence = "OFL-1.1"
+documents = ["assets/fonts/OFL-JetBrainsMono.txt"]
+
+[[bundled]]
+crate = "wordcraft-fonts"
+path = "assets/fonts/SourceSans3-Regular.ttf"
+licence = "OFL-1.1"
+documents = ["licenses/wordcraft-OFL-SourceSans3.txt"]
+
+[[bundled]]
+crate = "wordcraft-fonts"
+path = "assets/fonts/SourceSans3-Semibold.ttf"
+licence = "OFL-1.1"
+documents = ["licenses/wordcraft-OFL-SourceSans3.txt"]
+
+[[bundled]]
+crate = "wordcraft-fonts"
+path = "assets/fonts/SourceSans3-Bold.ttf"
+licence = "OFL-1.1"
+documents = ["licenses/wordcraft-OFL-SourceSans3.txt"]
+
+[[bundled]]
+crate = "wordcraft-fonts"
+path = "assets/fonts/SourceSans3-It.ttf"
+licence = "OFL-1.1"
+documents = ["licenses/wordcraft-OFL-SourceSans3.txt"]
+
+[[bundled]]
+crate = "wordcraft-fonts"
+path = "assets/fonts/SourceSerif4-Regular.ttf"
+licence = "OFL-1.1"
+documents = ["licenses/wordcraft-OFL-SourceSerif4.txt"]
+
+[[bundled]]
+crate = "wordcraft-fonts"
+path = "assets/fonts/SourceSerif4-Semibold.ttf"
+licence = "OFL-1.1"
+documents = ["licenses/wordcraft-OFL-SourceSerif4.txt"]
+
+[[bundled]]
+crate = "wordcraft-fonts"
+path = "assets/fonts/SourceSerif4-Bold.ttf"
+licence = "OFL-1.1"
+documents = ["licenses/wordcraft-OFL-SourceSerif4.txt"]
+
+[[bundled]]
+crate = "wordcraft-fonts"
+path = "assets/fonts/SourceSerif4-It.ttf"
+licence = "OFL-1.1"
+documents = ["licenses/wordcraft-OFL-SourceSerif4.txt"]
+
+[[bundled]]
+crate = "wordcraft-fonts"
+path = "assets/fonts/SourceSerif4-BoldIt.ttf"
+licence = "OFL-1.1"
+documents = ["licenses/wordcraft-OFL-SourceSerif4.txt"]

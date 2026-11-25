@@ -7,7 +7,7 @@ use egui_kittest::Harness;
 use egui_kittest::kittest::Queryable;
 use pdfcraft_ui_egui::{LeftPanel, PdfCraftApp};
 
-const DROP_ZONE: &str = "Drop a PDF here or click to open";
+const DROP_ZONE: &str = "Drop a PDF or Word file here or click to open";
 /// The tiles' labels, in the order the Home shows them.
 const TILES: [&str; 4] = ["Fill & Sign", "Edit", "Convert", "OCR"];
 /// The tools the web build left out: they have no tile.
@@ -148,29 +148,29 @@ fn a_failed_open_clears_the_picked_tool() {
     assert_ne!(h.state().left, LeftPanel::Tool("edit"), "a later file must not start Edit");
 }
 
-/// In a browser on Android the web Home suggests the Compilo PDF app on Google Play and links to its
-/// store page; on an iPhone or a computer it does not, and neither does the desktop Home.
+/// The web Home links to the Compilo PDF app on Google Play for every visitor, on a phone and on a
+/// computer, and the link is on the first screen; the desktop Home does not have it.
 #[test]
-fn the_web_home_suggests_the_android_app_only_on_android() {
-    for (web, android) in [(true, true), (true, false), (false, true)] {
-        let mut h = Harness::builder().with_size(egui::vec2(412.0, 915.0)).build_eframe(move |_cc| {
+fn the_web_home_links_to_the_android_app_for_every_visitor() {
+    for (web, size) in [(true, egui::vec2(412.0, 915.0)), (true, egui::vec2(1280.0, 800.0)), (false, egui::vec2(412.0, 915.0))] {
+        let mut h = Harness::builder().with_size(size).build_eframe(move |_cc| {
             let mut app = PdfCraftApp::new();
             if web {
                 app.set_web_profile();
             }
-            app.android = android;
             app.set_option("language", "en").unwrap();
             app
         });
         h.run_steps(4);
         let link = h.query_by_label(pdfcraft_ui_egui::web_profile::PLAY_STORE_LABEL);
-        assert_eq!(link.is_some(), web && android, "web profile: {web}, Android: {android}");
+        assert_eq!(link.is_some(), web, "web profile: {web}, window {size:?}");
         if let Some(link) = link {
-            let screen = egui::Rect::from_min_size(egui::Pos2::ZERO, egui::vec2(412.0, 915.0));
-            assert!(screen.contains_rect(link.rect()), "the link {:?} is on the first screen", link.rect());
+            let screen = egui::Rect::from_min_size(egui::Pos2::ZERO, size);
+            assert!(screen.contains_rect(link.rect()), "the link {:?} is on the first screen of {size:?}", link.rect());
         }
     }
-    assert!(pdfcraft_ui_egui::web_profile::PLAY_STORE_URL.starts_with("https://play.google.com/store/apps/details?id=com.pdfcraft.pdfcraft_mobile"));
+    // The app's own store page and nothing else: no campaign or tracking tag rides along.
+    assert_eq!(pdfcraft_ui_egui::web_profile::PLAY_STORE_URL, "https://play.google.com/store/apps/details?id=com.pdfcraft.pdfcraft_mobile");
 }
 
 #[test]

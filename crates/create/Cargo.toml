@@ -26,7 +26,19 @@ thiserror = { workspace = true }
 # Already in the graph through lopdf; used only to read plain-text files (decode_text).
 encoding_rs = "0.8"
 
+# Word files (.docx, .doc) become PDFs through WordCraft, in the browser build only (`word.rs` says why:
+# off the web its font database also reads the machine's own fonts, which may not enter a PDF).
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+wordcraft-docx = { workspace = true }
+wordcraft-docbin = { workspace = true }
+wordcraft-pdf = { workspace = true }
+
 [dev-dependencies]
+# The same converter for the tests, which run natively, with WordCraft's bundled fonts alone.
+wordcraft-docx = { workspace = true }
+wordcraft-docbin = { workspace = true }
+wordcraft-pdf = { workspace = true }
+wordcraft-fonts = { workspace = true, features = ["test-support"] }
 # An independent CCITT decoder, to check Create PDF's Group 4 images.
 hayro-ccitt.workspace = true
 image = { version = "0.25", default-features = false, features = ["bmp", "gif", "jpeg"] }

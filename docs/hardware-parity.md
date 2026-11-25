@@ -1,6 +1,6 @@
 # Hardware and platform parity
 
-> **Last reviewed:** 2026-10-10 · **Last updated:** 2026-10-11 · **Change:** minor (web printing through the browser's print dialog; earlier: shared craft-print spooler with passing Windows CI; Windows printers row and 1:1 touchpad scrolling, #756, #759) · **Target:** Adobe Acrobat Pro (Acrobat DC, continuous track 26.002.21931, macOS)
+> **Last reviewed:** 2026-10-10 · **Last updated:** 2026-11-25 · **Change:** minor (Word files open as PDFs in the web build; earlier: web printing through the browser's print dialog; earlier: shared craft-print spooler with passing Windows CI; Windows printers row and 1:1 touchpad scrolling, #756, #759) · **Target:** Adobe Acrobat Pro (Acrobat DC, continuous track 26.002.21931, macOS)
 
 Each hardware feature Acrobat Pro uses, per platform, ours against Acrobat's. Acrobat runs on macOS
 and Windows (plus a limited web viewer/editor in Document Cloud); PdfCraft runs on macOS, Windows,
@@ -34,12 +34,13 @@ printing are counted in their feature areas). **Platforms ≈ 70% ready, 15–30
 | Windows (x64, x86, ARM64) | yes (x64, ARM64) | yes | signed installers | — |
 | Linux | no | yes | AppImage, deb, rpm, Flatpak, tarball | Chinese faces in Flatpak (#689) |
 | FreeBSD | no | yes | package | — |
-| Web | Acrobat online (cloud) | yes (WASM, offline in the browser; Recognize text downloads its models from the same site the first time) | static site, deployed to GitHub Pages by `.github/workflows/pages.yml` in the Compilo PDF fork | OCR in multiple files, crash recovery, PKCS #12 signing (the web build leaves them out or marks them "Desktop app only"); Recognize text reads one page a frame on the page's only thread |
+| Web | Acrobat online (cloud) | yes (WASM, offline in the browser; Recognize text downloads its models from the same site the first time; Word files open as PDFs, converted in the page by WordCraft) | static site, deployed to GitHub Pages by `.github/workflows/pages.yml` in the Compilo PDF fork | OCR in multiple files, crash recovery, PKCS #12 signing (the web build leaves them out or marks them "Desktop app only"); Recognize text reads one page a frame on the page's only thread |
 
 ## Revision history
 
 | Date | Change | Summary |
 |---|---|---|
+| 2026-11-25 | minor | Web row: Word files (`.docx`, `.doc`) open as PDFs, converted in the page by WordCraft; its bundled fonts add to the download |
 | 2026-11-02 | minor | Web row: Recognize text runs in the browser, with the models downloaded from the site on first use |
 | 2026-11-01 | minor | Web row: a hosted deployment (the Compilo PDF fork on GitHub Pages) leaves the gap list; the web build marks its three missing features as desktop-only |
 | 2026-10-11 | minor | Web printers row: printing through the browser's print dialog (gap 4 closed); Web platform row no longer lists printing |

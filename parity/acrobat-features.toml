@@ -6997,15 +6997,15 @@ notes = ""
 
 [[feature]]
 id = "create.from-office"
-title = "Create PDF from Office documents (LibreOffice sidecar)"
+title = "Create PDF from Office documents (Word in the web build; LibreOffice sidecar planned)"
 area = "J"
 tier = "P2"
 milestone = "M10"
-status = "planned"
+status = "partial"
 commands = []
 tools = []
-evidence = []
-notes = ""
+evidence = ["crates/create/src/word.rs::a_docx_becomes_a_pdf_with_its_pages", "crates/create/src/word.rs::what_is_not_a_readable_word_file_is_refused_with_its_name", "crates/create/src/word.rs::hostile_bytes_never_panic", "crates/engine/src/tests.rs::a_word_file_is_not_converted_outside_the_browser_build"]
+notes = "Web build only: a Word file (.docx, .docm, .doc) dropped or picked with Open becomes a new unsaved PDF, read and laid out by WordCraft in the page with its own bundled fonts. The layout is WordCraft's, not Word's: Word's fonts are replaced, so line and page breaks differ. Desktop builds refuse with a message, because WordCraft's font database would also read the machine's fonts and write them into the PDF (AGENTS.md section 1.4); the LibreOffice sidecar of the title is not built. Not reachable headlessly. Password-protected files and files over 32 MiB are refused. Checked on synthetic .docx files and in a browser; .doc has not been tried on a real file. Excel, PowerPoint, OpenDocument, RTF and HTML to PDF: none."
 
 [[feature]]
 id = "create.create-multiple"

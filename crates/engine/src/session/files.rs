@@ -5,6 +5,13 @@ use super::{
 };
 
 impl Session {
+    /// What [`Self::convert_to_pdf`] names when it refuses a file. Word files convert only in the
+    /// browser build (`pdfcraft_create::word_to_pdf`), so only it offers them.
+    #[cfg(target_arch = "wasm32")]
+    const CONVERTIBLE_KINDS: &'static str = "a PDF, a Word file, an image or a .txt file";
+    #[cfg(not(target_arch = "wasm32"))]
+    const CONVERTIBLE_KINDS: &'static str = "a PDF, an image or a .txt file";
+
     /// The page count of another PDF (Replace Pages, Insert Pages dialogs).
     pub fn page_count_of(&self, name: &str, bytes: &Arc<Vec<u8>>) -> Result<usize, EditError> {
         Ok(pdfcraft_organize::page_count(&open_source(name, bytes)?)?)
@@ -39,11 +46,12 @@ impl Session {
         self.write_new(&doc)
     }
 
-    /// Convert a file Create understands (an image or plain text) to PDF bytes; a PDF is checked
-    /// (it must open and allow copying pages) and returned as it is.
+    /// Convert a file Create understands (an image, plain text or, in the browser build, a Word
+    /// file) to PDF bytes; a PDF is checked (it must open and allow copying pages) and returned as
+    /// it is.
     pub fn convert_to_pdf(&self, name: &str, bytes: &Arc<Vec<u8>>) -> Result<(SourceKind, Arc<Vec<u8>>), EditError> {
         let Some(kind) = source_kind(name, bytes) else {
-            return Err(EditError::Source(format!("{name}: this file type can't be converted; use a PDF, an image or a .txt file")));
+            return Err(EditError::Source(format!("{name}: this file type can't be converted; use {}", Self::CONVERTIBLE_KINDS)));
         };
         let title = name.rsplit_once('.').map_or(name, |(s, _)| s);
         // Image decoders read untrusted bytes: a panic in one must not take the app down.
@@ -51,6 +59,7 @@ impl Session {
             SourceKind::Pdf => open_source(name, bytes).map(|_| bytes.clone()),
             SourceKind::Image => self.create_from_images(&[(name.to_string(), bytes.to_vec())]),
             SourceKind::Text => self.create_from_text(title, &decode_text(bytes)),
+            SourceKind::Word => pdfcraft_create::word_to_pdf(name, bytes).map(Arc::new).map_err(EditError::from),
         })
         .map_err(|_| EditError::Source(format!("{name}: the file could not be read")))?;
         Ok((kind, created?))
@@ -62,7 +71,7 @@ impl Session {
     pub fn as_pdf(&self, name: &str, bytes: &Arc<Vec<u8>>) -> Result<Arc<Vec<u8>>, EditError> {
         let pdf = match source_kind(name, bytes) {
             Some(SourceKind::Pdf) => true,
-            Some(SourceKind::Image | SourceKind::Text) => false,
+            Some(SourceKind::Image | SourceKind::Text | SourceKind::Word) => false,
             None => name.to_ascii_lowercase().ends_with(".pdf"),
         };
         if pdf { Ok(bytes.clone()) } else { self.convert_to_pdf(name, bytes).map(|(_, pdf)| pdf) }

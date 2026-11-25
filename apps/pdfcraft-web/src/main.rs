@@ -25,10 +25,16 @@ fn main() {
                     let mut app = PdfCraftApp::new();
                     // Compilo PDF: Neon unless the visitor saved another theme, so this comes before `restore`.
                     app.set_web_profile();
+                    // A browser gives `Session` no system clock: without these, Fill & Sign's Date stamps
+                    // 1 Jan 1970 and `/ModDate` is never written (`Session::with_wall_clock`).
+                    app.session = std::mem::take(&mut app.session).with_wall_clock(wall_clock, utc_offset);
                     // "printcraft": settings saved under the app's former name, PrintCraft.
                     if let Some(json) = cc.storage.and_then(|s| s.get_string("pdfcraft").or_else(|| s.get_string("printcraft"))) {
                         app.restore(&json);
                     }
+                    // Dates read the way the browser's language writes them, unless the visitor chose a format:
+                    // after `restore`, whose saved settings hold the default for a visitor who never changed it.
+                    app.follow_browser_date_format();
                     // `?file=<url>` opens a PDF from a URL (same-origin or CORS-enabled).
                     if let Some(url) = query_param("file") {
                         let inbox = app.startup_inbox.clone();
@@ -93,6 +99,33 @@ fn main() {
             }
         }
     });
+}
+
+/// The UTC time in seconds since the Unix epoch for `millis`, what JavaScript's `Date.now()` gives. A
+/// clock that gives nothing usable counts as the epoch, as a session with no clock does.
+#[cfg(any(target_arch = "wasm32", test))]
+fn epoch_seconds(millis: f64) -> i64 {
+    // A JavaScript `Date` never leaves ±8.64e12 seconds, so the engine adding the zone cannot overflow.
+    if millis.is_finite() { (millis / 1000.0).clamp(-8.64e12, 8.64e12).floor() as i64 } else { 0 }
+}
+
+/// The local zone's seconds east of UTC for `minutes_behind`, what JavaScript's
+/// `Date.getTimezoneOffset()` gives: minutes *behind* UTC, so negative east of it (Rome in summer is
+/// -120). No zone is further than a day from UTC; anything else counts as UTC.
+#[cfg(any(target_arch = "wasm32", test))]
+fn seconds_east_of_utc(minutes_behind: f64) -> i64 {
+    if minutes_behind.is_finite() { -((minutes_behind.clamp(-1440.0, 1440.0) * 60.0).round() as i64) } else { 0 }
+}
+
+#[cfg(target_arch = "wasm32")]
+fn wall_clock() -> i64 {
+    epoch_seconds(js_sys::Date::now())
+}
+
+/// Asked on every use, because the zone changes with the date (daylight saving).
+#[cfg(target_arch = "wasm32")]
+fn utc_offset() -> i64 {
+    seconds_east_of_utc(js_sys::Date::new_0().get_timezone_offset())
 }
 
 /// What the page says when the app can't start (no WebGL, for example): one short plain sentence
@@ -303,7 +336,31 @@ fn main() {
 
 #[cfg(test)]
 mod tests {
-    use super::failure_text;
+    use super::{epoch_seconds, failure_text, seconds_east_of_utc};
+
+    #[test]
+    fn the_browser_clock_becomes_epoch_seconds() {
+        assert_eq!(epoch_seconds(1_792_024_200_123.0), 1_792_024_200);
+        assert_eq!(epoch_seconds(0.0), 0);
+        assert_eq!(epoch_seconds(-1.0), -1, "before the epoch rounds down, not toward zero");
+        for odd in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+            assert_eq!(epoch_seconds(odd), 0, "{odd}");
+        }
+        assert_eq!(epoch_seconds(f64::MAX), 8_640_000_000_000, "an absurd clock stops at the end of what a Date can hold");
+        assert_eq!(epoch_seconds(f64::MIN), -8_640_000_000_000);
+    }
+
+    #[test]
+    fn the_browser_zone_is_seconds_east_of_utc() {
+        assert_eq!(seconds_east_of_utc(-120.0), 7_200, "Rome in summer");
+        assert_eq!(seconds_east_of_utc(-60.0), 3_600, "Rome in winter");
+        assert_eq!(seconds_east_of_utc(300.0), -18_000, "New York in winter");
+        assert_eq!(seconds_east_of_utc(-330.0), 19_800, "India, a half-hour zone");
+        assert_eq!(seconds_east_of_utc(0.0), 0);
+        for odd in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY, f64::MAX, f64::MIN] {
+            assert!(seconds_east_of_utc(odd).abs() <= 86_400, "{odd}");
+        }
+    }
 
     #[test]
     fn failure_text_mentions_webgl_and_is_never_empty_or_long() {

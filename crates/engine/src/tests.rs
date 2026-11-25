@@ -1430,8 +1430,9 @@ fn a_page_with_a_form_field_shown_twice_keeps_one_field() {
 #[test]
 fn files_that_cannot_be_converted_are_refused_clearly() {
     let s = Session::new();
-    let err = s.convert_to_pdf("report.docx", &Arc::new(b"PK\x03\x04".to_vec())).unwrap_err();
-    assert_eq!(err, EditError::Source("report.docx: this file type can't be converted; use a PDF, an image or a .txt file".into()));
+    // A spreadsheet is a ZIP like a Word file, but not one Create converts.
+    let err = s.convert_to_pdf("report.xlsx", &Arc::new(b"PK\x03\x04".to_vec())).unwrap_err();
+    assert_eq!(err, EditError::Source("report.xlsx: this file type can't be converted; use a PDF, an image or a .txt file".into()));
     assert!(matches!(s.convert_to_pdf("empty", &Arc::new(Vec::new())), Err(EditError::Source(_))));
     // Damaged inputs of a known type fail with an error, not a panic.
     assert!(s.convert_to_pdf("bad.png", &Arc::new(b"\x89PNG\r\n\x1a\nnope".to_vec())).is_err());
@@ -1452,8 +1453,20 @@ fn files_for_combine_are_made_into_pdfs_and_pdfs_pass_through() {
     assert!(Arc::ptr_eq(&s.as_pdf("old.PDF", &headless).unwrap(), &headless));
     assert!(s.as_pdf("scan.jpg", &Arc::new(jpeg_bytes())).unwrap().starts_with(b"%PDF-"));
     assert!(s.as_pdf("notes.txt", &Arc::new(b"hello".to_vec())).unwrap().starts_with(b"%PDF-"));
-    let err = s.as_pdf("report.docx", &Arc::new(b"PK\x03\x04".to_vec())).unwrap_err();
-    assert!(matches!(err, EditError::Source(m) if m.starts_with("report.docx: this file type can't be converted")));
+    let err = s.as_pdf("report.xlsx", &Arc::new(b"PK\x03\x04".to_vec())).unwrap_err();
+    assert!(matches!(err, EditError::Source(m) if m.starts_with("report.xlsx: this file type can't be converted")));
+}
+
+/// A Word file is a kind Create knows (`SourceKind::Word`), so it is not refused as an unknown type:
+/// the browser build converts it, and any other build says so instead of calling it a bad PDF.
+#[cfg(not(target_arch = "wasm32"))]
+#[test]
+fn a_word_file_is_not_converted_outside_the_browser_build() {
+    let s = Session::new();
+    for (name, bytes) in [("report.docx", b"PK\x03\x04".to_vec()), ("old.doc", vec![0xD0, 0xCF, 0x11, 0xE0, 0xA1, 0xB1, 0x1A, 0xE1])] {
+        let err = s.convert_to_pdf(name, &Arc::new(bytes)).unwrap_err().to_string();
+        assert!(err.starts_with(name) && err.contains("web version"), "{err}");
+    }
 }
 
 fn protected(user: &str, owner: &str, permissions: i32) -> Arc<Vec<u8>> {

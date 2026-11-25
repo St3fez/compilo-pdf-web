@@ -195,7 +195,6 @@ impl PdfCraftApp {
             ocr_run: None,
             ocr_batch: None,
             web_ocr: ocr_ui::WebOcr::default(),
-            android: false,
             phone_doc: None,
             run_inline: false,
             custom_actions: Vec::new(),
