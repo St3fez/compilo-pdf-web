@@ -11,23 +11,32 @@ Open it: <https://st3fez.github.io/compilo-pdf-web/>
 
 The first visit downloads about 17.5 MB, almost all of it the WebAssembly (47 MB once unpacked, as GitHub
 Pages serves it compressed); the scripts are 26 KB. With the files cached the editor starts in about one
-second.
+second. These figures were measured before Word files could be opened: WordCraft's code and fonts add to
+both, and the next deployment has to be measured again.
 
 The web build is deliberately small. It fills in and signs a PDF, edits it, converts it to Word, prints it
 and recognizes the text of scanned pages (OCR); everything else PdfCraft does (combine, organize, comment,
 redact, protect, forms authoring and the rest) stays in the desktop app and is left out of the web menus,
-tool lists and search. Word is export only: there is no Word to PDF. OCR reads the open file, one page at a
+tool lists and search. OCR reads the open file, one page at a
 time: the browser gives it one thread, so the page pauses while each page is read (about 7 seconds a page on
 a desktop computer, longer on a phone). The
 models read the Latin alphabet, as on the desktop. They are by Robert Knight (ocrs), licensed CC-BY-SA-4.0;
 the site carries their licence and credits in [models/](https://st3fez.github.io/compilo-pdf-web/models/ATTRIBUTION.txt).
 Signing with a PKCS #12 certificate stays desktop only.
 
+A Word file (`.docx` or `.doc`) opens as a new PDF, dropped on the page or picked with Open, so it can be
+filled in and signed like any other file. WordCraft, an open-source word processor written in Rust, reads it
+and lays it out in the page, and the Word file is never changed. The layout is WordCraft's, not Word's: the
+fonts a Word file asks for are not on the page, so a bundled look-alike set draws the text, and lines and
+pages can break in other places. Files over 32 MiB and password-protected ones are refused; the desktop
+build does not convert Word files. The Date tool writes the date the way the browser's language does
+(25/11/2026 for Italian) unless a format was chosen in Preferences.
+
 On a phone held upright (narrower than 600 points) the layout changes. A document opens on its page, and a
 tool pane, when opened, takes the screen instead of squeezing the page; picking a tool in it gives the
 screen back to the page. The mode tabs become one menu and the search box a button, and dialogs fit the
 screen width and scroll when they are taller than it. Tablets and phones held sideways keep the full
-layout. In a browser on Android the Home links to the Compilo PDF app on Google Play.
+layout. The Home links to the Compilo PDF app for Android on Google Play, for every visitor.
 
 For search engines the page has an Italian title and description, a canonical address, Open Graph
 and Twitter tags with a preview image (`og-image.png`), schema.org `WebApplication` data, a site icon

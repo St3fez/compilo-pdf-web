@@ -1,6 +1,6 @@
 # File format parity
 
-> **Last reviewed:** 2026-10-12 · **Last updated:** 2026-10-19 · **Change:** patch (`.p7b`/`.p7c` bundles read for trust import) · **Target:** Adobe Acrobat Pro (Acrobat DC, continuous track 26.002.21931, macOS)
+> **Last reviewed:** 2026-10-12 · **Last updated:** 2026-11-25 · **Change:** minor (Word to PDF in the web build; earlier: `.p7b`/`.p7c` bundles read for trust import) · **Target:** Adobe Acrobat Pro (Acrobat DC, continuous track 26.002.21931, macOS)
 
 Every format Acrobat Pro reads or writes, and PdfCraft's support for it. Acrobat's list comes from
 its bundle's `Info.plist` `CFBundleDocumentTypes` (what it opens) and its public documentation
@@ -68,7 +68,8 @@ features total).
 | Plain text | yes | yes | good | `create.from-text` |
 | Clipboard (image or text) | yes | yes | good | `create.from-clipboard` |
 | Screenshot | yes | no | none | `create.from-screenshot` planned |
-| Word, Excel, PowerPoint (and Visio, Publisher on Windows) | yes | no | none | `create.from-office` planned (LibreOffice sidecar) |
+| Word (`.docx`, `.docm`, `.doc`) | yes | web build only: WordCraft reads the file and lays it out, with its bundled fonts; a desktop build refuses with a message | basic: checked on synthetic files, in a browser; Word's own fonts are replaced, so line and page breaks differ; `.doc` not yet tried on a real file | `create.from-office` partial (`pdfcraft_create::word_to_pdf`) |
+| Excel, PowerPoint (and Visio, Publisher on Windows) | yes | no | none | `create.from-office` planned (LibreOffice sidecar) |
 | HTML file, web page URL | yes | no | none | `create.from-html`, `create.from-web-page` planned |
 | RTF | yes | no | none | |
 | PostScript / EPS (Distiller) | yes | no | none | `create.distiller` planned (P3) |
@@ -110,6 +111,7 @@ features total).
 
 | Date | Change | Summary |
 |---|---|---|
+| 2026-11-25 | minor | Create PDF reads Word files (`.docx`, `.docm`, `.doc`) in the web build, through WordCraft; desktop and Excel/PowerPoint unchanged. |
 | 2026-10-19 | patch | Certificates row: `.p7b`/`.p7c` bundles (DER or PEM `PKCS7`/`CMS`) are read for trust import. |
 | 2026-10-12 | minor | XDP split into data (read and write for XFA forms, already shipped under `form.xfa-data`) and opening `.xdp` as a document (none). Create PDF reads BigTIFF; malformed GIF headers are no longer detected as images. |
 | 2026-10-11 | minor | #773: inferred tables have no invented borders; rotated or overlapping invoice pages use floating shapes and page sections. Full Office layout fidelity remains partial. |
