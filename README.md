@@ -36,7 +36,9 @@ On a phone held upright (narrower than 600 points) the layout changes. A documen
 tool pane, when opened, takes the screen instead of squeezing the page; picking a tool in it gives the
 screen back to the page. The mode tabs become one menu and the search box a button, and dialogs fit the
 screen width and scroll when they are taller than it. Tablets and phones held sideways keep the full
-layout. The Home links to the Compilo PDF app for Android on Google Play, for every visitor.
+layout. A wide button at the bottom of the Home opens the Compilo PDF app for Android on Google Play, for
+every visitor; it stays in view whatever the page holds, and its glow beats for a few seconds, not at all
+when the system asks for reduced motion.
 
 For search engines the page has an Italian title and description, a canonical address, Open Graph
 and Twitter tags with a preview image (`og-image.png`), schema.org `WebApplication` data, a site icon
