@@ -148,11 +148,14 @@ fn a_failed_open_clears_the_picked_tool() {
     assert_ne!(h.state().left, LeftPanel::Tool("edit"), "a later file must not start Edit");
 }
 
-/// The web Home links to the Compilo PDF app on Google Play for every visitor, on a phone and on a
-/// computer, and the link is on the first screen; the desktop Home does not have it.
+/// The web Home has a wide button at the bottom of the window that opens the Compilo PDF app on Google
+/// Play, for every visitor, on a phone and on a computer. It is on the first screen, below the page's own
+/// content and big enough to press, and a click opens the store; the desktop Home does not have it.
 #[test]
-fn the_web_home_links_to_the_android_app_for_every_visitor() {
-    for (web, size) in [(true, egui::vec2(412.0, 915.0)), (true, egui::vec2(1280.0, 800.0)), (false, egui::vec2(412.0, 915.0))] {
+fn the_web_home_has_a_store_button_at_the_bottom_for_every_visitor() {
+    for (web, size) in
+        [(true, egui::vec2(412.0, 915.0)), (true, egui::vec2(1280.0, 800.0)), (true, egui::vec2(360.0, 640.0)), (false, egui::vec2(412.0, 915.0))]
+    {
         let mut h = Harness::builder().with_size(size).build_eframe(move |_cc| {
             let mut app = PdfCraftApp::new();
             if web {
@@ -164,10 +167,19 @@ fn the_web_home_links_to_the_android_app_for_every_visitor() {
         h.run_steps(4);
         let link = h.query_by_label(pdfcraft_ui_egui::web_profile::PLAY_STORE_LABEL);
         assert_eq!(link.is_some(), web, "web profile: {web}, window {size:?}");
-        if let Some(link) = link {
-            let screen = egui::Rect::from_min_size(egui::Pos2::ZERO, size);
-            assert!(screen.contains_rect(link.rect()), "the link {:?} is on the first screen of {size:?}", link.rect());
-        }
+        let Some(link) = link else { continue };
+        let rect = link.rect();
+        let screen = egui::Rect::from_min_size(egui::Pos2::ZERO, size);
+        assert!(screen.contains_rect(rect), "the button {rect:?} is on the first screen of {size:?}");
+        assert!(rect.bottom() > size.y - 40.0, "the button {rect:?} sits at the bottom of {size:?}");
+        assert!(rect.height() >= 48.0 && rect.width() >= 280.0f32.min(size.x - 40.0), "the button {rect:?} is big enough to press in {size:?}");
+        let zone = h.get_by_label(DROP_ZONE).rect();
+        assert!(zone.bottom() <= rect.top(), "the drop zone {zone:?} stays above the button {rect:?} in {size:?}");
+        assert_eq!(h.state().last_opened_url, None, "nothing opens before a click");
+        h.get_by_label(pdfcraft_ui_egui::web_profile::PLAY_STORE_LABEL).click();
+        h.run_steps(3);
+        assert_eq!(h.state().last_opened_url.as_deref(), Some(pdfcraft_ui_egui::web_profile::PLAY_STORE_URL), "a click opens the store in {size:?}");
+        assert!(h.state().views.is_empty(), "the Home stays as it was");
     }
     // The app's own store page and nothing else: no campaign or tracking tag rides along.
     assert_eq!(pdfcraft_ui_egui::web_profile::PLAY_STORE_URL, "https://play.google.com/store/apps/details?id=com.pdfcraft.pdfcraft_mobile");

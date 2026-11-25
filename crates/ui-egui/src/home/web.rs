@@ -1,7 +1,7 @@
 //! The Home of the web profile: a drop zone above four tool tiles, then the Recent list. Opening a
 //! file by dropping it is the app's own handler; this page only shows where to drop and what to do.
 
-use egui::{Align2, CornerRadius, Rect, Sense, Shape, Stroke, pos2, vec2};
+use egui::{CornerRadius, Rect, Sense, Shape, Stroke, pos2, vec2};
 use pdfcraft_engine::catalog;
 
 use super::card_lift;
@@ -28,11 +28,46 @@ fn columns(width: f32) -> usize {
     (((width + GAP) / (TILE_MIN + GAP)).floor() as usize).clamp(1, 4)
 }
 
+/// The widest the store button gets, and the least it is tall (a comfortable thumb target).
+const STORE_MAX_WIDTH: f32 = 520.0;
+const STORE_HEIGHT: f32 = 56.0;
+/// The padding inside the store button, and the room its phone icon takes with the gap after it.
+const STORE_PAD: f32 = 18.0;
+const STORE_ICON_ROOM: f32 = 34.0;
+
+/// How long the store button's glow beats after the Home first shows, and the time of one beat, in seconds.
+const PULSE_FOR: f32 = 10.0;
+const PULSE_PERIOD: f32 = 2.0;
+/// The glow once it has settled, and how far the first beat swings from it (the glow runs 0 to 1).
+const GLOW_REST: f32 = 0.65;
+const GLOW_SWING: f32 = 0.35;
+
+/// The strength of the store button's glow `elapsed` seconds after the Home first showed. It beats
+/// around [`GLOW_REST`] with a swing that fades to nothing over [`PULSE_FOR`] seconds, so it asks for a
+/// look once and then settles instead of flashing for as long as the page is open. It does not beat
+/// when the window does not `animated` (reduced motion), and an elapsed time that is not a positive
+/// number gets the settled glow.
+fn pulse(elapsed: f32, animated: bool) -> f32 {
+    if !animated || !elapsed.is_finite() || elapsed <= 0.0 || elapsed >= PULSE_FOR {
+        return GLOW_REST;
+    }
+    let fade = 1.0 - elapsed / PULSE_FOR;
+    GLOW_REST + GLOW_SWING * fade * (std::f32::consts::TAU * elapsed / PULSE_PERIOD).sin()
+}
+
 /// Draw the web Home.
 pub fn show(app: &mut PdfCraftApp, ui: &mut egui::Ui) {
     let t = Tokens::get(ui.ctx());
     // A phone keeps a narrower margin so the tiles get the width.
     let side: i8 = if ui.available_width() < 600.0 { 16 } else { 36 };
+    // The Compilo PDF app for Android, for every visitor: a computer's can follow the link to the store
+    // and install it on a phone. The button is pinned under the page, so it is on the first screen
+    // whatever the Recent list holds, and the store opens in a new tab so the files open here stay open.
+    // A panel has to be shown before the page it sits beside.
+    egui::Panel::bottom("web-home-store")
+        .resizable(false)
+        .frame(egui::Frame::NONE.inner_margin(egui::Margin { left: side, right: side, top: 14, bottom: 16 }))
+        .show(ui, |ui| store_button(app, ui, &t));
     egui::ScrollArea::vertical().auto_shrink([false, false]).show(ui, |ui| {
         egui::Frame::NONE.inner_margin(egui::Margin { left: side, right: side, top: 28, bottom: 28 }).show(ui, |ui| {
             ui.label(egui::RichText::new(tl!("Welcome to PdfCraft")).font(theme::semibold(26.0)));
@@ -46,11 +81,6 @@ pub fn show(app: &mut PdfCraftApp, ui: &mut egui::Ui) {
                     .color(t.text_muted)
                     .font(theme::regular(13.0)),
             );
-            // The Compilo PDF app for Android, for every visitor: a computer's can follow the link to the
-            // store and install it on a phone. The store opens in a new tab, so the files open here stay open.
-            ui.add_space(8.0);
-            let label = egui::RichText::new(tl!(crate::web_profile::PLAY_STORE_LABEL)).font(theme::semibold(14.0));
-            ui.add(egui::Hyperlink::from_label_and_url(label, crate::web_profile::PLAY_STORE_URL).open_in_new_tab(true));
             ui.add_space(18.0);
             drop_zone(app, ui, &t);
             ui.add_space(22.0);
@@ -59,6 +89,55 @@ pub fn show(app: &mut PdfCraftApp, ui: &mut egui::Ui) {
             super::recent(app, ui, &t);
         });
     });
+}
+
+/// The wide button under the Home that opens the Compilo PDF app's page on Google Play. It is lime on
+/// the Neon theme (dark ink) and the accent colour on the others (white ink), and its glow beats for a
+/// few seconds, see [`pulse`]. The label wraps on a phone and the button grows to hold it.
+fn store_button(app: &mut PdfCraftApp, ui: &mut egui::Ui, t: &Tokens) {
+    let label = tl!(crate::web_profile::PLAY_STORE_LABEL);
+    let (fill, ink) = t.neon.map_or((t.accent, egui::Color32::WHITE), |n| (n.lime, t.titlebar));
+    let width = ui.available_width().min(STORE_MAX_WIDTH);
+    // The label is laid out first, so the button is as tall as its lines.
+    let text_room = (width - 2.0 * STORE_PAD - STORE_ICON_ROOM).max(40.0);
+    let galley = ui.fonts_mut(|f| f.layout_job(egui::text::LayoutJob::simple(label.to_owned(), theme::semibold(15.0), ink, text_room)));
+    let height = (galley.size().y + 2.0 * (STORE_PAD - 4.0)).max(STORE_HEIGHT);
+    ui.vertical_centered(|ui| {
+        let (rect, resp) = ui.allocate_exact_size(vec2(width, height), Sense::click());
+        resp.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Link, true, label));
+        let press = theme::Press::track(ui, &resp);
+        // Beats for the first seconds the Home is up; the clock starts the first time it is drawn.
+        let (now, animated) = (ui.input(|i| i.time), crate::motion::animated(ui.ctx()));
+        let first = ui.ctx().data_mut(|d| *d.get_temp_mut_or_insert_with(egui::Id::unique("web-home-store-first-seen"), || now));
+        let elapsed = (now - first) as f32;
+        if animated && elapsed < PULSE_FOR {
+            ui.ctx().request_repaint_after(std::time::Duration::from_millis(33));
+        }
+        let glow = (pulse(elapsed, animated) + 0.3 * press.hover).min(1.0);
+        let radius = CornerRadius::same(14);
+        // The halo reaches past the panel that holds the button, so it may paint outside the panel.
+        let outside = ui.painter().with_clip_rect(ui.clip_rect().expand(40.0));
+        neon::glow(&outside, rect, radius, fill, glow);
+        let body = press.fill(fill, fill.lerp_to_gamma(egui::Color32::WHITE, 0.2), fill.lerp_to_gamma(egui::Color32::BLACK, 0.2));
+        ui.painter().rect_filled(rect, radius, body);
+        // A phone and the label, centred together; a label that wraps keeps the phone beside its first line.
+        let group = STORE_ICON_ROOM + galley.size().x;
+        let left = rect.center().x - group * 0.5;
+        let middle = rect.center().y + press.offset().y;
+        paint_phone(ui.painter(), pos2(left + 9.0, middle), ink);
+        ui.painter().galley(pos2(left + STORE_ICON_ROOM, middle - galley.size().y * 0.5), galley, ink);
+        if theme::hand(resp).clicked() {
+            app.open_url(crate::web_profile::PLAY_STORE_URL);
+        }
+    });
+}
+
+/// A small outlined phone: a rounded body and a bar for the home button, drawn here (no icon file).
+fn paint_phone(painter: &egui::Painter, center: egui::Pos2, ink: egui::Color32) {
+    let stroke = Stroke::new(2.0, ink);
+    let body = Rect::from_center_size(center, vec2(16.0, 26.0));
+    painter.rect_stroke(body, CornerRadius::same(4), stroke, egui::StrokeKind::Inside);
+    painter.line_segment([pos2(center.x - 3.0, body.bottom() - 5.0), pos2(center.x + 3.0, body.bottom() - 5.0)], stroke);
 }
 
 /// The dashed magenta target that opens the file dialog; the window's own drop handler does the rest.
@@ -80,13 +159,17 @@ fn drop_zone(app: &mut PdfCraftApp, ui: &mut egui::Ui, t: &Tokens) {
     painter.extend(Shape::dashed_line(&corners, Stroke::new(2.0, color), 9.0, 7.0));
     let body = rect.translate(press.offset());
     icons::paint(ui, Rect::from_center_size(body.center() - vec2(0.0, 24.0), vec2(36.0, 36.0)), "folder-open", 34.0, color);
-    ui.painter().text(
-        body.center() + vec2(0.0, 22.0),
-        Align2::CENTER_CENTER,
-        tl!("Drop a PDF or Word file here or click to open"),
+    // The words wrap inside the target and stay centred: a language with longer words (Italian) would
+    // otherwise run past both edges of a phone. With `Align::Center` the galley is placed by its centre.
+    let mut job = egui::text::LayoutJob::simple(
+        tl!("Drop a PDF or Word file here or click to open").to_owned(),
         theme::semibold(16.0),
         t.text,
+        (rect.width() - 32.0).max(40.0),
     );
+    job.halign = egui::Align::Center;
+    let galley = ui.fonts_mut(|f| f.layout_job(job));
+    ui.painter().galley(pos2(body.center().x, body.center().y + 22.0 - galley.size().y * 0.5), galley, t.text);
     if theme::hand(resp).clicked() {
         app.open_dialog();
     }
@@ -152,6 +235,31 @@ mod tests {
         ids.sort_unstable();
         ids.dedup();
         assert_eq!(ids.len(), WEB_TILES.len());
+    }
+
+    #[test]
+    fn the_glow_beats_at_first_and_settles_after_ten_seconds() {
+        assert_eq!(pulse(0.0, true), GLOW_REST, "it starts from the settled glow");
+        let beats: Vec<f32> = (1..40).map(|i| pulse(i as f32 * 0.25, true)).collect();
+        assert!(beats.iter().any(|g| *g > GLOW_REST + 0.2), "a beat lights it up");
+        assert!(beats.iter().any(|g| *g < GLOW_REST - 0.1), "and dims it");
+        assert!(beats.iter().all(|g| (0.0..=1.0).contains(g)), "the glow stays in 0..=1: {beats:?}");
+        // The swing fades out, so the last second is calmer than the first.
+        let swing = |from: f32| (0..20).map(|i| (pulse(from + i as f32 * 0.05, true) - GLOW_REST).abs()).fold(0.0, f32::max);
+        assert!(swing(9.0) < swing(0.5) * 0.5, "{} against {}", swing(9.0), swing(0.5));
+        for settled in [PULSE_FOR, PULSE_FOR + 0.01, 60.0, 1.0e9, f32::INFINITY] {
+            assert_eq!(pulse(settled, true), GLOW_REST, "{settled}");
+        }
+    }
+
+    #[test]
+    fn the_glow_does_not_beat_with_reduced_motion_or_a_clock_that_is_not_a_time() {
+        for elapsed in [0.5, 1.5, 4.0] {
+            assert_eq!(pulse(elapsed, false), GLOW_REST, "{elapsed}");
+        }
+        for odd in [-1.0, -0.001, f32::NAN, f32::NEG_INFINITY, f32::INFINITY] {
+            assert_eq!(pulse(odd, true), GLOW_REST, "{odd}");
+        }
     }
 
     #[test]
