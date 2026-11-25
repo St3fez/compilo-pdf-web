@@ -24,6 +24,14 @@ Layer L4. Create a PDF (Acrobat's Create a PDF tool), execution plan M10.2:
   (comment summaries, compare reports): such characters are written as `[U+XXXX]` and the first
   line says so (`ESCAPED_NOTE`).
 
+- `word_to_pdf(name, bytes)` (and `is_word`): a Word file (`.docx`, `.docm`, `.doc`) as PDF bytes, read and laid
+  out by WordCraft in Rust (`wordcraft-docx`, `wordcraft-docbin`, `wordcraft-pdf`, pinned in the workspace
+  `Cargo.toml`) with its bundled OFL fonts. **Browser build only** (`wasm32`) and in this crate's tests:
+  elsewhere WordCraft's font database also reads the machine's own fonts, which may not enter a PDF
+  (AGENTS.md §1.4), so a desktop build refuses with a message. Input over `MAX_WORD_BYTES` (32 MiB) is refused
+  unread; password-protected files are refused. Layout is WordCraft's, not Word's: fonts Word has and the
+  bundled set lacks are replaced, so line and page breaks can differ.
+
 Every function returns a `pdfcraft_cos::Document`; the caller writes it.
 
 Image export and Save Image As apply each lossless image's Decode pair before converting its color components.

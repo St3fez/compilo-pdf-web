@@ -7,7 +7,7 @@ use egui_kittest::Harness;
 use egui_kittest::kittest::Queryable;
 use pdfcraft_ui_egui::{LeftPanel, PdfCraftApp};
 
-const DROP_ZONE: &str = "Drop a PDF here or click to open";
+const DROP_ZONE: &str = "Drop a PDF or Word file here or click to open";
 /// The tiles' labels, in the order the Home shows them.
 const TILES: [&str; 4] = ["Fill & Sign", "Edit", "Convert", "OCR"];
 /// The tools the web build left out: they have no tile.

@@ -66,7 +66,7 @@ pub fn show(app: &mut PdfCraftApp, ui: &mut egui::Ui) {
 /// The dashed magenta target that opens the file dialog; the window's own drop handler does the rest.
 fn drop_zone(app: &mut PdfCraftApp, ui: &mut egui::Ui, t: &Tokens) {
     let (rect, resp) = ui.allocate_exact_size(vec2(ui.available_width(), 150.0), Sense::click());
-    resp.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, true, tl!("Drop a PDF here or click to open")));
+    resp.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, true, tl!("Drop a PDF or Word file here or click to open")));
     let press = theme::Press::track(ui, &resp);
     // A file being dragged over the window lights the target up.
     let dragging = ui.input(|i| !i.raw.hovered_files.is_empty());
@@ -82,7 +82,13 @@ fn drop_zone(app: &mut PdfCraftApp, ui: &mut egui::Ui, t: &Tokens) {
     painter.extend(Shape::dashed_line(&corners, Stroke::new(2.0, color), 9.0, 7.0));
     let body = rect.translate(press.offset());
     icons::paint(ui, Rect::from_center_size(body.center() - vec2(0.0, 24.0), vec2(36.0, 36.0)), "folder-open", 34.0, color);
-    ui.painter().text(body.center() + vec2(0.0, 22.0), Align2::CENTER_CENTER, tl!("Drop a PDF here or click to open"), theme::semibold(16.0), t.text);
+    ui.painter().text(
+        body.center() + vec2(0.0, 22.0),
+        Align2::CENTER_CENTER,
+        tl!("Drop a PDF or Word file here or click to open"),
+        theme::semibold(16.0),
+        t.text,
+    );
     if theme::hand(resp).clicked() {
         app.open_dialog();
     }
