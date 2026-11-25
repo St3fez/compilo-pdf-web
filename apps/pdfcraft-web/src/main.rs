@@ -32,6 +32,9 @@ fn main() {
                     if let Some(json) = cc.storage.and_then(|s| s.get_string("pdfcraft").or_else(|| s.get_string("printcraft"))) {
                         app.restore(&json);
                     }
+                    // Dates read the way the browser's language writes them, unless the visitor chose a format:
+                    // after `restore`, whose saved settings hold the default for a visitor who never changed it.
+                    app.follow_browser_date_format();
                     // `?file=<url>` opens a PDF from a URL (same-origin or CORS-enabled).
                     if let Some(url) = query_param("file") {
                         let inbox = app.startup_inbox.clone();

@@ -116,6 +116,52 @@ pub(crate) fn product_name(web_profile: bool) -> &'static str {
     if web_profile { NAME } else { "PdfCraft" }
 }
 
+/// The date format that writes a date the way `probe` does: the browser's own text for 25 November
+/// 2026, in its language, with two-digit days and months. The day, the month and the year are found
+/// by their digits (the year first, so its "20" and "26" are not taken for the day or the month);
+/// the rest has to be separators, or the browser used letters or digits of another script (a month
+/// name, Arabic-Indic numerals, a Buddhist-era year) that no pattern here can copy, and the result
+/// is `None`. The direction marks some right-to-left locales put around each number are dropped.
+#[cfg(any(target_arch = "wasm32", test))]
+fn date_pattern_from_probe(probe: &str) -> Option<String> {
+    let marked = probe.replacen("2026", "\u{1}", 1).replacen("25", "\u{2}", 1).replacen("11", "\u{3}", 1);
+    let mut pattern = String::new();
+    let mut found = [false; 3];
+    for c in marked.chars() {
+        match c {
+            '\u{1}' => {
+                pattern.push_str("yyyy");
+                found[0] = true;
+            }
+            '\u{2}' => {
+                pattern.push_str("dd");
+                found[1] = true;
+            }
+            '\u{3}' => {
+                pattern.push_str("mm");
+                found[2] = true;
+            }
+            '\u{200e}' | '\u{200f}' | '\u{61c}' => {}
+            '/' | '.' | '-' | ' ' => pattern.push(c),
+            _ => return None,
+        }
+    }
+    found.iter().all(|f| *f).then_some(pattern)
+}
+
+/// What the browser writes for 25 November 2026 in its language (`navigator.language`), in the
+/// Gregorian calendar and Western digits, with a two-digit day and month. Noon in the local zone,
+/// so the zone cannot move the day.
+#[cfg(target_arch = "wasm32")]
+fn browser_date_probe() -> Option<String> {
+    let language = web_sys::window()?.navigator().language()?;
+    let options = js_sys::Object::new();
+    for (key, value) in [("year", "numeric"), ("month", "2-digit"), ("day", "2-digit"), ("calendar", "gregory"), ("numberingSystem", "latn")] {
+        js_sys::Reflect::set(&options, &key.into(), &value.into()).ok()?;
+    }
+    js_sys::Date::new_with_year_month_day_hr_min_sec(2026, 10, 25, 12, 0, 0).to_locale_date_string(&language, &options).as_string()
+}
+
 impl PdfCraftApp {
     /// Turn the web profile on. Call it before `restore`, so a theme the visitor saved wins over
     /// the Neon default.
@@ -129,6 +175,28 @@ impl PdfCraftApp {
         if self.theme_preference == ThemePreference::System {
             self.set_theme_preference(ThemePreference::Neon);
         }
+    }
+
+    /// Write dates the way the browser's language does (25/11/2026 for Italian, 2026-11-25 for Swedish)
+    /// unless a date format was chosen. The default format counts as not chosen: it is also what the
+    /// settings of a visitor who never changed it hold, so call this after `restore`. Does nothing
+    /// off the web.
+    pub fn follow_browser_date_format(&mut self) {
+        #[cfg(target_arch = "wasm32")]
+        if let Some(pattern) = browser_date_probe().as_deref().and_then(date_pattern_from_probe) {
+            self.use_date_format_unless_chosen(&pattern);
+        }
+    }
+
+    #[cfg(any(target_arch = "wasm32", test))]
+    fn use_date_format_unless_chosen(&mut self, pattern: &str) {
+        // The default already writes the month, the day and the year in that order, the US way, and
+        // without the padding zero; a US browser keeps it.
+        if pattern == "mm/dd/yyyy" || self.session.date_format() != pdfcraft_engine::dates::DEFAULT_DATE_FORMAT {
+            return;
+        }
+        // A pattern the engine refuses leaves the default.
+        let _ = self.session.set_date_format(pattern);
     }
 
     /// Whether `command` is one the web profile cannot run (see [`DESKTOP_ONLY`]).
@@ -254,5 +322,61 @@ mod tests {
         assert!(app.hides_group("redact") && !app.hides_group("scan"));
         assert!(app.hides_tool("export", "export.html") && !app.hides_tool("export", "export.docx"));
         assert!(app.hides_command("page.combine") && !app.hides_command("print.dialog"));
+    }
+
+    /// What a browser writes for 25 November 2026 with a two-digit day and month, by language.
+    const PROBES: [(&str, Option<&str>); 14] = [
+        ("25/11/2026", Some("dd/mm/yyyy")),
+        ("11/25/2026", Some("mm/dd/yyyy")),
+        ("25.11.2026", Some("dd.mm.yyyy")),
+        ("2026-11-25", Some("yyyy-mm-dd")),
+        ("2026/11/25", Some("yyyy/mm/dd")),
+        ("2026. 11. 25.", Some("yyyy. mm. dd.")),
+        ("\u{200f}25\u{200f}/\u{200f}11\u{200f}/\u{200f}2026", Some("dd/mm/yyyy")),
+        ("\u{0662}\u{0665}/\u{0661}\u{0661}/\u{0662}\u{0660}\u{0662}\u{0666}", None),
+        ("25 novembre 2026", None),
+        ("25.11.2026 \u{0433}.", None),
+        ("25/25/2026", None),
+        ("2026", None),
+        ("11/25", None),
+        ("", None),
+    ];
+
+    #[test]
+    fn the_browsers_way_of_writing_a_date_becomes_a_date_format() {
+        for (probe, pattern) in PROBES {
+            assert_eq!(date_pattern_from_probe(probe).as_deref(), pattern, "{probe:?}");
+        }
+    }
+
+    #[test]
+    fn every_date_format_taken_from_a_browser_is_one_the_engine_accepts() {
+        for (probe, _) in PROBES {
+            if let Some(pattern) = date_pattern_from_probe(probe) {
+                assert!(pdfcraft_engine::dates::check_date_format(&pattern).is_ok(), "{pattern}");
+            }
+        }
+    }
+
+    #[test]
+    fn the_browsers_date_format_replaces_the_default_and_nothing_the_visitor_chose() {
+        let default = pdfcraft_engine::dates::DEFAULT_DATE_FORMAT;
+        let mut app = PdfCraftApp::new();
+        assert_eq!(app.session.date_format(), default);
+        app.use_date_format_unless_chosen("dd/mm/yyyy");
+        assert_eq!(app.session.date_format(), "dd/mm/yyyy", "an Italian browser");
+
+        let mut chosen = PdfCraftApp::new();
+        chosen.session.set_date_format("yyyy.mm.dd.").unwrap();
+        chosen.use_date_format_unless_chosen("dd/mm/yyyy");
+        assert_eq!(chosen.session.date_format(), "yyyy.mm.dd.", "the visitor's choice wins");
+
+        let mut us = PdfCraftApp::new();
+        us.use_date_format_unless_chosen("mm/dd/yyyy");
+        assert_eq!(us.session.date_format(), default, "a US browser keeps the default");
+
+        let mut refused = PdfCraftApp::new();
+        refused.use_date_format_unless_chosen("Year");
+        assert_eq!(refused.session.date_format(), default, "a pattern the engine refuses changes nothing");
     }
 }
