@@ -9,10 +9,10 @@ its cache (GitHub Pages sets ten minutes).
 
 Open it: <https://st3fez.github.io/compilo-pdf-web/>
 
-The first visit downloads about 17.5 MB, almost all of it the WebAssembly (47 MB once unpacked, as GitHub
+The first visit downloads about 24 MB, almost all of it the WebAssembly (65 MB once unpacked, as GitHub
 Pages serves it compressed); the scripts are 26 KB. With the files cached the editor starts in about one
-second. These figures were measured before Word files could be opened: WordCraft's code and fonts add to
-both, and the next deployment has to be measured again.
+second. Measured on the deployed site on 2026-11-25: Word support took it from about 17.5 MB (47 MB
+unpacked) before, the cost of WordCraft's layout and PDF writer and its bundled fonts.
 
 The web build is deliberately small. It fills in and signs a PDF, edits it, converts it to Word, prints it
 and recognizes the text of scanned pages (OCR); everything else PdfCraft does (combine, organize, comment,
